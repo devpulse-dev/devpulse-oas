@@ -1,6 +1,6 @@
 # 📊 DevPulse OpenAPI Contracts
 
-> Централизованное хранилище OpenAPI контрактов для Markable Dev Analytics — сервиса аналитики активности разработчиков
+> Централизованное хранилище OpenAPI контрактов для DevPulse — сервиса аналитики активности разработчиков
 
 [![GitHub Actions](https://github.com/devpulse-dev/devpulse-oas/actions/workflows/deploy.yml/badge.svg)](https://github.com/devpulse-dev/devpulse-oas/actions)
 [![GitHub Packages](https://img.shields.io/badge/GitHub-Packages-blue)](https://github.com/devpulse-dev/devpulse-oas/packages)
@@ -26,9 +26,9 @@ devpulse-oas/
 
 | Модуль | Описание | Версия |
 |--------|----------|--------|
-| **shared-contract** | Общие схемы (UUID, DateTime, Error), security схемы | `1.0.0` |
+| **shared-contract** | Общие схемы (UUID, DateTime, Error), security схемы, типы данных | `1.0.0` |
 | **collection-contract** | API для управления сбором данных из Git и Kaiten | `1.0.0` |
-| **dashboard-contract** | API для дашборда с топ-N активных и аутсайдерами | `1.0.0` |
+| **dashboard-contract** | API для дашборда с пагинацией авторов | `1.0.0` |
 | **stats-contract** | API для получения статистики по разработчикам | `1.0.0` |
 | **users-contract** | API для работы с профилями пользователей и их коммитами | `1.0.0` |
 | **kaiten-contract** | API для интеграции с Kaiten | `1.0.0` |
@@ -57,32 +57,32 @@ cd devpulse-oas
 
 <dependencies>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>collection-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>dashboard-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>stats-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>users-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>kaiten-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
     <dependency>
-        <groupId>com.markable.dev</groupId>
+        <groupId>com.devpulse</groupId>
         <artifactId>shared-contract</artifactId>
         <version>1.0.0</version>
     </dependency>
@@ -126,29 +126,32 @@ done
 
 Управление сбором данных из Git и Kaiten:
 
-- `POST /api/v2/collection/runs` — запустить сбор данных
+- `POST /api/v2/collection/runs` — запустить сбор данных (опциональный параметр `since`)
 - `GET /api/v2/collection/runs/{id}` — получить статус прогона сбора
 
 ### Dashboard API
 
-Дашборд с активностью разработчиков:
+Дашборд с активностью разработчиков (новый paginated API):
 
-- `GET /api/v2/dashboard` — получить данные дашборда (топ-N активных + аутсайдеры)
+- `GET /api/v2/dashboard` — получить данные дашборда с пагинацией
+  - Параметры: `from`, `to` (опционально), `page` (default 0), `size` (default 20, max 500)
+  - Возвращает: paginated список авторов, отсортированный по не-мердж коммитам
+  - **Изменения в v2:** Убраны `topN` и `outsiderN`, добавлена пагинация
 
 ### Stats API
 
 Статистика по разработчикам:
 
 - `GET /api/v2/stats/daily` — получить дневную статистику
-- `GET /api/v2/stats/weekly` — получить недельную статистику
+- `GET /api/v2/stats/weekly` — получить недельную статистику (ISO-недели)
 - `GET /api/v2/stats/summary` — получить сводку за период
 
 ### Users API
 
 Профили и коммиты пользователей:
 
-- `GET /api/v2/users/{email}/profile` — получить профиль пользователя
-- `GET /api/v2/users/{email}/commits` — получить коммиты пользователя
+- `GET /api/v2/users/{email}/profile` — получить профиль пользователя (опциональные `from`, `to`)
+- `GET /api/v2/users/{email}/commits` — получить коммиты пользователя с пагинацией
 
 ### Kaiten API
 

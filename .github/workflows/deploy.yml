@@ -79,4 +79,4 @@ jobs:
           echo "📅 Timestamp: $(date)"
           echo ""
           echo "📊 Packages available at:"
-          echo "https://github.com/dev-Markable/markable-dev-analytics-oas/packages"
+          echo "https://github.com/devpulse-dev/devpulse-oas/packages"

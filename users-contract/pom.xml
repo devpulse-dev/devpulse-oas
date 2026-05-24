@@ -5,12 +5,12 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.markable.dev</groupId>
+    <groupId>com.devpulse</groupId>
     <artifactId>users-contract</artifactId>
     <version>1.0.0</version>
     <packaging>jar</packaging>
 
-    <name>Users Contract</name>
+    <name>DevPulse Users Contract</name>
     <description>API контракты для пользователей</description>
 
     <properties>
@@ -21,7 +21,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.markable.dev</groupId>
+            <groupId>com.devpulse</groupId>
             <artifactId>shared-contract</artifactId>
             <version>1.0.0</version>
             <scope>provided</scope>
@@ -38,9 +38,9 @@
     </build>
 
     <scm>
-        <connection>scm:git:https://github.com/dev-Markable/markable-dev-analytics-oas.git</connection>
-        <developerConnection>scm:git:https://github.com/dev-Markable/markable-dev-analytics-oas.git</developerConnection>
-        <url>https://github.com/dev-Markable/markable-dev-analytics-oas</url>
+        <connection>scm:git:https://github.com/devpulse-dev/devpulse-oas.git</connection>
+        <developerConnection>scm:git:https://github.com/devpulse-dev/devpulse-oas.git</developerConnection>
+        <url>https://github.com/devpulse-dev/devpulse-oas</url>
         <tag>HEAD</tag>
     </scm>
 
@@ -48,7 +48,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/dev-Markable/markable-dev-analytics-oas</url>
+            <url>https://maven.pkg.github.com/devpulse-dev/devpulse-oas</url>
         </repository>
     </distributionManagement>
 </project>

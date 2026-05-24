@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
-  title: Markable Dev Analytics - Collection API
+  title: DevPulse - Collection API
   version: 1.0.0
   description: API для управления сбором данных из Git и Kaiten
 
 servers:
   - url: http://localhost:8080/api/v2
     description: Локальный сервер разработки
-  - url: https://api.markable.dev/api/v2
+  - url: https://api.devpulse.dev/api/v2
     description: Продакшн сервер
 
 tags:
@@ -23,31 +23,30 @@ paths:
       description: |
         Запускает полный цикл сбора: git → daily stats → (изолированно) sync Kaiten users 
         (обновление kaitenId/avatarUrl в unified_user). Карточки Kaiten НЕ выкачиваются — 
-        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат 
-        (SUCCESS или FAILED).
+        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат (SUCCESS или FAILED).
       operationId: startCollectionRun
       requestBody:
-        description: Опциональные параметры запуска
+        description: Опциональные параметры запуска сбора
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StartCollectionRequest'
+              $ref: 'shared.yaml#/components/schemas/CollectionRunRequest'
             example:
               since: "2026-05-10T00:00:00"
         required: false
       responses:
         '200':
-          description: Сбор успешно завершён (успешно или с ошибкой)
+          description: Прогон сбора запущен и завершён
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CollectionRun'
+                $ref: 'shared.yaml#/components/schemas/CollectionRun'
               example:
-                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                id: "f1a4c0d2-..."
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
-                sinceDate: "2026-05-10T00:00:00"
-                untilDate: "2026-05-23T14:00:00"
+                sinceDate: "2026-05-10"
+                untilDate: "2026-05-23"
                 status: "SUCCESS"
                 errorMessage: null
         '400':
@@ -66,82 +65,25 @@ paths:
         - name: id
           in: path
           required: true
-          description: UUID прогона сбора
           schema:
             $ref: 'shared.yaml#/components/schemas/Uuid'
-          example: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+          description: ID прогона сбора
       responses:
         '200':
-          description: Информация о прогоне сбора
+          description: Статус прогона сбора
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CollectionRun'
+                $ref: 'shared.yaml#/components/schemas/CollectionRun'
               example:
-                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                id: "f1a4c0d2-..."
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
-                sinceDate: "2026-05-10T00:00:00"
-                untilDate: "2026-05-23T14:00:00"
+                sinceDate: "2026-05-10"
+                untilDate: "2026-05-23"
                 status: "SUCCESS"
                 errorMessage: null
         '404':
           $ref: 'shared.yaml#/components/responses/NotFound'
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
-
-components:
-  schemas:
-    StartCollectionRequest:
-      type: object
-      description: Запрос на запуск сбора данных
-      properties:
-        since:
-          type: string
-          format: date-time
-          description: |
-            Момент начала периода (LocalDateTime). Если опущено или null — берётся точка 
-            из последнего успешного прогона (или 2026-01-01 если прогонов ещё не было).
-          example: "2026-05-10T00:00:00"
-
-    CollectionRun:
-      type: object
-      required:
-        - id
-        - startedAt
-        - finishedAt
-        - sinceDate
-        - untilDate
-        - status
-      properties:
-        id:
-          $ref: 'shared.yaml#/components/schemas/Uuid'
-          description: Уникальный идентификатор прогона
-        startedAt:
-          $ref: 'shared.yaml#/components/schemas/DateTime'
-          description: Время начала прогона
-        finishedAt:
-          $ref: 'shared.yaml#/components/schemas/DateTime'
-          description: Время завершения прогона
-        sinceDate:
-          $ref: 'shared.yaml#/components/schemas/DateTime'
-          description: Начало периода сбора
-        untilDate:
-          $ref: 'shared.yaml#/components/schemas/DateTime'
-          description: Конец периода сбора
-        status:
-          type: string
-          enum: [RUNNING, SUCCESS, FAILED]
-          description: Статус прогона
-          example: "SUCCESS"
-        errorMessage:
-          type: string
-          nullable: true
-          description: Сообщение об ошибке (если status = FAILED)
-          example: null
-
-    CollectionStatus:
-      type: string
-      enum: [RUNNING, SUCCESS, FAILED]
-      description: Статус прогона сбора данных
-      x-enum-varnames: [RUNNING, SUCCESS, FAILED]

@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
-  title: Markable Dev Analytics - Dashboard API
+  title: DevPulse - Dashboard API
   version: 1.0.0
-  description: API для дашборда с топ-N активных и аутсайдерами
+  description: API для дашборда с активностью разработчиков
 
 servers:
   - url: http://localhost:8080/api/v2
     description: Локальный сервер разработки
-  - url: https://api.markable.dev/api/v2
+  - url: https://api.devpulse.dev/api/v2
     description: Продакшн сервер
 
 tags:
@@ -21,61 +21,43 @@ paths:
         - Dashboard
       summary: Получить данные дашборда
       description: |
-        Главный борд: топ-N самых активных + N «аутсайдеров» (наименее активные из тех, 
-        у кого хотя бы 1 коммит) за период.
+        Главный борд: paginated список всех активных авторов за период (имеющих ≥ 1 коммит).
+        Отсортирован по убыванию не-мердж коммитов (commits − mergeCommits) — отражает «реальную работу», 
+        мерджи не накручивают позицию в топе.
         
-        Если активных авторов меньше чем topN + outsiderN, списки могут пересекаться — 
-        это намеренно: «верх» и «низ» одного маленького списка.
+        Фронт может показать первую страницу как «топ» и последнюю как «аутсайдеры». 
+        Раздельных секций в API больше нет — один list + pagination.
       operationId: getDashboard
       parameters:
         - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
         - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
-        - name: topN
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
-            minimum: 1
-            maximum: 100
-          description: Сколько активных вернуть
-          example: 10
-        - name: outsiderN
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
-            minimum: 1
-            maximum: 100
-          description: Сколько аутсайдеров вернуть
-          example: 10
+        - $ref: 'shared.yaml#/components/parameters/Page'
+        - $ref: 'shared.yaml#/components/parameters/Size'
       responses:
         '200':
           description: Данные дашборда
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Dashboard'
+                $ref: '#/components/schemas/DashboardResponse'
               example:
                 from: "2026-04-23"
                 to: "2026-05-23"
-                topActive:
+                page: 0
+                size: 20
+                totalElements: 47
+                totalPages: 3
+                hasNext: true
+                items:
                   - email: "boris@x5.ru"
-                    commits: 47
-                    mergeCommits: 3
+                    displayName: "Boris"
+                    avatarUrl: "https://kaiten.x5.ru/.../avatar.png"
+                    commits: 50
+                    nonMergeCommits: 45
+                    mergeCommits: 5
                     addedLines: 1820
                     deletedLines: 850
                     testAddedLines: 320
-                outsiders:
-                  - email: "junior@x5.ru"
-                    commits: 2
-                    mergeCommits: 0
-                    addedLines: 18
-                    deletedLines: 5
-                    testAddedLines: 0
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':
@@ -83,13 +65,17 @@ paths:
 
 components:
   schemas:
-    Dashboard:
+    DashboardResponse:
       type: object
       required:
         - from
         - to
-        - topActive
-        - outsiders
+        - page
+        - size
+        - totalElements
+        - totalPages
+        - hasNext
+        - items
       properties:
         from:
           $ref: 'shared.yaml#/components/schemas/Date'
@@ -97,52 +83,32 @@ components:
         to:
           $ref: 'shared.yaml#/components/schemas/Date'
           description: Конец периода
-        topActive:
-          type: array
-          description: Топ-N самых активных разработчиков
-          items:
-            $ref: '#/components/schemas/AuthorStats'
-        outsiders:
-          type: array
-          description: N наименее активных разработчиков (с хотя бы 1 коммитом)
-          items:
-            $ref: '#/components/schemas/AuthorStats'
-
-    AuthorStats:
-      type: object
-      required:
-        - email
-        - commits
-        - mergeCommits
-        - addedLines
-        - deletedLines
-        - testAddedLines
-      properties:
-        email:
-          $ref: 'shared.yaml#/components/schemas/Email'
-          description: Email разработчика
-        commits:
+        page:
           type: integer
           format: int32
-          description: Количество коммитов
+          description: Текущий номер страницы (0-based)
+          example: 0
+        size:
+          type: integer
+          format: int32
+          description: Размер страницы
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Общее количество авторов
           example: 47
-        mergeCommits:
+        totalPages:
           type: integer
           format: int32
-          description: Количество merge коммитов
+          description: Общее количество страниц
           example: 3
-        addedLines:
-          type: integer
-          format: int64
-          description: Количество добавленных строк
-          example: 1820
-        deletedLines:
-          type: integer
-          format: int64
-          description: Количество удалённых строк
-          example: 850
-        testAddedLines:
-          type: integer
-          format: int64
-          description: Количество добавленных строк в тестах
-          example: 320
+        hasNext:
+          type: boolean
+          description: Есть ли следующая страница
+          example: true
+        items:
+          type: array
+          description: Список авторов на текущей странице
+          items:
+            $ref: 'shared.yaml#/components/schemas/AuthorSummary'

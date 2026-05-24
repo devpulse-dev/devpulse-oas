@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Markable Dev Analytics - Shared Components
+  title: DevPulse - Shared Components
   version: 1.0.0
   description: Общие схемы и компоненты для всех API модулей
 
@@ -44,7 +44,7 @@ components:
           type: string
           format: uri
           description: URI идентификатор типа ошибки
-          example: "urn:markable:problem:bad-request"
+          example: "urn:devpulse:problem:bad-request"
         title:
           type: string
           description: Краткое описание ошибки
@@ -122,6 +122,509 @@ components:
           type: integer
           format: int32
           description: Общее количество страниц
+
+    # Автор с агрегированной статистикой
+    AuthorSummary:
+      type: object
+      required:
+        - email
+        - commits
+        - mergeCommits
+        - nonMergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        displayName:
+          type: string
+          nullable: true
+          description: Отображаемое имя пользователя из Kaiten
+          example: "Boris"
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара пользователя из Kaiten
+          example: "https://kaiten.x5.ru/.../avatar.png"
+        commits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов (включая мерджи)
+          example: 50
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество мердж-коммитов
+          example: 5
+        nonMergeCommits:
+          type: integer
+          format: int32
+          description: Количество не-мердж коммитов (commits - mergeCommits)
+          example: 45
+        addedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк
+          example: 1820
+        deletedLines:
+          type: integer
+          format: int32
+          description: Количество удалённых строк
+          example: 850
+        testAddedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк в тестах
+          example: 320
+
+    # Прогон сбора данных
+    CollectionRun:
+      type: object
+      required:
+        - id
+        - startedAt
+        - finishedAt
+        - sinceDate
+        - untilDate
+        - status
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        startedAt:
+          $ref: '#/components/schemas/DateTime'
+        finishedAt:
+          $ref: '#/components/schemas/DateTime'
+        sinceDate:
+          $ref: '#/components/schemas/Date'
+        untilDate:
+          $ref: '#/components/schemas/Date'
+        status:
+          type: string
+          enum: [RUNNING, SUCCESS, FAILED]
+          description: Статус прогона сбора
+        errorMessage:
+          type: string
+          nullable: true
+          description: Сообщение об ошибке (если status = FAILED)
+
+    # Запрос на запуск сбора
+    CollectionRunRequest:
+      type: object
+      properties:
+        since:
+          type: string
+          format: date-time
+          nullable: true
+          description: Момент начала периода. Если опущено или null - берётся точка из последнего успешного прогона
+          example: "2026-05-10T00:00:00"
+
+    # Профиль пользователя
+    UserProfile:
+      type: object
+      required:
+        - id
+        - email
+        - username
+        - name
+        - kaitenId
+        - gitlabId
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID пользователя в системе
+          example: 42
+        email:
+          $ref: '#/components/schemas/Email'
+        username:
+          type: string
+          description: Имя пользователя
+          example: "boris"
+        name:
+          type: string
+          nullable: true
+          description: Полное имя пользователя
+          example: "Boris"
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара пользователя
+          example: "https://kaiten.x5.ru/.../avatar.png"
+        kaitenId:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID пользователя в Kaiten
+          example: 7
+        gitlabId:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID пользователя в GitLab
+          example: null
+
+    # Коммит
+    Commit:
+      type: object
+      required:
+        - hash
+        - authorEmail
+        - commitDate
+        - merge
+        - addedLines
+        - deletedLines
+        - testAddedLines
+        - message
+        - repo
+      properties:
+        hash:
+          type: string
+          description: Хеш коммита
+          example: "a1b2c3d4e5f6..."
+        authorEmail:
+          $ref: '#/components/schemas/Email'
+        commitDate:
+          $ref: '#/components/schemas/DateTime'
+        merge:
+          type: boolean
+          description: Является ли коммитом мерджем
+          example: false
+        addedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк
+          example: 42
+        deletedLines:
+          type: integer
+          format: int32
+          description: Количество удалённых строк
+          example: 7
+        testAddedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк в тестах
+          example: 12
+        message:
+          type: string
+          description: Сообщение коммита
+          example: "12345 fix the bug"
+        taskNumber:
+          type: string
+          nullable: true
+          description: Номер задачи из сообщения коммита
+          example: "12345"
+        repo:
+          type: string
+          description: Название репозитория
+          example: "xrg-core"
+
+    # Карточка Kaiten
+    KaitenCard:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - columnName
+        - boardName
+        - spaceName
+        - ownerId
+        - ownerName
+        - createdAt
+        - updatedAt
+        - archived
+        - url
+        - memberIds
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID карточки
+          example: 12345
+        title:
+          type: string
+          description: Заголовок карточки
+          example: "Fix the bug"
+        description:
+          type: string
+          nullable: true
+          description: Описание карточки
+          example: "..."
+        status:
+          type: string
+          description: Статус карточки
+          example: "in_progress"
+        columnName:
+          type: string
+          description: Название колонки
+          example: "In Progress"
+        boardName:
+          type: string
+          description: Название доски
+          example: "Core"
+        spaceName:
+          type: string
+          description: Название пространства
+          example: "Engineering"
+        ownerId:
+          type: integer
+          format: int64
+          description: ID владельца карточки
+          example: 7
+        ownerName:
+          type: string
+          description: Имя владельца карточки
+          example: "Boris"
+        createdAt:
+          $ref: '#/components/schemas/DateTime'
+        updatedAt:
+          $ref: '#/components/schemas/DateTime'
+        closedAt:
+          $ref: '#/components/schemas/DateTime'
+          nullable: true
+        archived:
+          type: boolean
+          description: Архивирована ли карточка
+          example: false
+        url:
+          type: string
+          format: uri
+          description: URL карточки в Kaiten
+          example: "https://kaiten.x5.ru/12345"
+        memberIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: ID участников карточки
+          example: [7]
+
+    # Сводка статистики пользователя
+    UserStatsSummary:
+      type: object
+      required:
+        - email
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        commits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов
+          example: 47
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество мердж-коммитов
+          example: 3
+        addedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк
+          example: 1820
+        deletedLines:
+          type: integer
+          format: int32
+          description: Количество удалённых строк
+          example: 850
+        testAddedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк в тестах
+          example: 320
+
+    # Дневная статистика
+    DailyStats:
+      type: object
+      required:
+        - id
+        - email
+        - date
+        - repo
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+        - lastUpdated
+        - userId
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID записи
+          example: 12345
+        email:
+          $ref: '#/components/schemas/Email'
+        date:
+          $ref: '#/components/schemas/Date'
+        repo:
+          type: string
+          description: Название репозитория
+          example: "xrg-core"
+        commits:
+          type: integer
+          format: int32
+          description: Количество коммитов
+          example: 3
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество мердж-коммитов
+          example: 0
+        addedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк
+          example: 124
+        deletedLines:
+          type: integer
+          format: int32
+          description: Количество удалённых строк
+          example: 58
+        testAddedLines:
+          type: integer
+          format: int32
+          description: Количество добавленных строк в тестах
+          example: 22
+        lastUpdated:
+          $ref: '#/components/schemas/DateTime'
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 42
+
+    # Недельная статистика
+    WeeklyStats:
+      type: object
+      required:
+        - year
+        - week
+        - weekStart
+        - totalCommits
+        - totalMergeCommits
+        - totalAddedLines
+        - totalDeletedLines
+        - totalTestAddedLines
+        - authors
+      properties:
+        year:
+          type: integer
+          format: int32
+          description: Год
+          example: 2026
+        week:
+          type: integer
+          format: int32
+          description: Номер недели по ISO
+          example: 19
+        weekStart:
+          $ref: '#/components/schemas/Date'
+        totalCommits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов за неделю
+          example: 47
+        totalMergeCommits:
+          type: integer
+          format: int32
+          description: Общее количество мердж-коммитов за неделю
+          example: 3
+        totalAddedLines:
+          type: integer
+          format: int32
+          description: Общее количество добавленных строк за неделю
+          example: 1820
+        totalDeletedLines:
+          type: integer
+          format: int32
+          description: Общее количество удалённых строк за неделю
+          example: 850
+        totalTestAddedLines:
+          type: integer
+          format: int32
+          description: Общее количество добавленных строк в тестах за неделю
+          example: 320
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorSummary'
+          description: Статистика по авторам за неделю
+
+    # Сводка за период
+    PeriodSummary:
+      type: object
+      required:
+        - from
+        - to
+        - totalCommits
+        - totalMergeCommits
+        - totalAddedLines
+        - totalDeletedLines
+        - totalTestAddedLines
+        - uniqueAuthors
+        - topAuthors
+      properties:
+        from:
+          $ref: '#/components/schemas/Date'
+        to:
+          $ref: '#/components/schemas/Date'
+        totalCommits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов за период
+          example: 312
+        totalMergeCommits:
+          type: integer
+          format: int32
+          description: Общее количество мердж-коммитов за период
+          example: 18
+        totalAddedLines:
+          type: integer
+          format: int32
+          description: Общее количество добавленных строк за период
+          example: 12400
+        totalDeletedLines:
+          type: integer
+          format: int32
+          description: Общее количество удалённых строк за период
+          example: 5800
+        totalTestAddedLines:
+          type: integer
+          format: int32
+          description: Общее количество добавленных строк в тестах за период
+          example: 2120
+        uniqueAuthors:
+          type: integer
+          format: int32
+          description: Количество уникальных авторов за период
+          example: 14
+        topAuthors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorSummary'
+          description: Топ авторов за период
+
+    # Ответ на синхронизацию пользователей Kaiten
+    KaitenSyncResponse:
+      type: object
+      required:
+        - synced
+      properties:
+        synced:
+          type: integer
+          format: int32
+          description: Количество синхронизированных пользователей
+          example: 142
 
   # Security схемы
   securitySchemes:
@@ -207,7 +710,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
           example:
-            type: "urn:markable:problem:bad-request"
+            type: "urn:devpulse:problem:bad-request"
             title: "Bad request"
             status: 400
             detail: "period.to (2026-05-01) is before period.from (2026-05-31)"
@@ -223,7 +726,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
           example:
-            type: "urn:markable:problem:internal"
+            type: "urn:devpulse:problem:internal"
             title: "Internal server error"
             status: 500
             detail: "Unexpected error occurred"

@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
-  title: Markable Dev Analytics - Kaiten API
+  title: DevPulse - Kaiten API
   version: 1.0.0
   description: API для интеграции с Kaiten
 
 servers:
   - url: http://localhost:8080/api/v2
     description: Локальный сервер разработки
-  - url: https://api.markable.dev/api/v2
+  - url: https://api.devpulse.dev/api/v2
     description: Продакшн сервер
 
 tags:
@@ -26,25 +26,12 @@ paths:
       operationId: syncKaitenUsers
       responses:
         '200':
-          description: Пользователи успешно синхронизированы
+          description: Пользователи синхронизированы
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncResult'
+                $ref: 'shared.yaml#/components/schemas/KaitenSyncResponse'
               example:
                 synced: 142
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
-
-components:
-  schemas:
-    SyncResult:
-      type: object
-      required:
-        - synced
-      properties:
-        synced:
-          type: integer
-          format: int32
-          description: Количество синхронизированных пользователей
-          example: 142
