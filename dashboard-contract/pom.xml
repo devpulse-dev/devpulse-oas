@@ -24,20 +24,25 @@
             <groupId>com.markable.dev</groupId>
             <artifactId>shared-contract</artifactId>
             <version>1.0.0</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
     <build>
         <resources>
             <resource>
-                <directory>src/main/resources</directory>
-                <includes>
-                    <include>**/*.yaml</include>
-                    <include>**/*.yml</include>
-                </includes>
+                <directory>src/main/resources/openapi</directory>
+                <filtering>false</filtering>
             </resource>
         </resources>
     </build>
+
+    <scm>
+        <connection>scm:git:https://github.com/dev-Markable/markable-dev-analytics-oas.git</connection>
+        <developerConnection>scm:git:https://github.com/dev-Markable/markable-dev-analytics-oas.git</developerConnection>
+        <url>https://github.com/dev-Markable/markable-dev-analytics-oas</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <distributionManagement>
         <repository>

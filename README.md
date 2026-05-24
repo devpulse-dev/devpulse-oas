@@ -104,6 +104,22 @@ for module in shared-contract collection-contract dashboard-contract stats-contr
 done
 ```
 
+### 4. Деплой через GitHub Actions
+
+Проект использует GitHub Actions для деплоя в GitHub Packages. Вы можете запустить деплой:
+
+1. Перейдите в раздел **Actions** в репозитории
+2. Выберите workflow **🚀 Deploy Contracts**
+3. Нажмите **Run workflow**
+4. Выберите модуль для деплоя:
+   - `all` — все модули
+   - `shared-contract` — только общие компоненты
+   - `collection-contract` — API управления сбором
+   - `dashboard-contract` — API дашборда
+   - `stats-contract` — API статистики
+   - `users-contract` — API пользователей
+   - `kaiten-contract` — API интеграции с Kaiten
+
 ## 📚 Документация API
 
 ### Collection API
