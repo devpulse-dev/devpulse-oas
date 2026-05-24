@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: Markable Dev Analytics - Kaiten API
+  version: 1.0.0
+  description: API для интеграции с Kaiten
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Локальный сервер разработки
+  - url: https://api.markable.dev/api/v2
+    description: Продакшн сервер
+
+tags:
+  - name: Kaiten
+    description: Интеграция с Kaiten
+
+paths:
+  /kaiten/sync-users:
+    post:
+      tags:
+        - Kaiten
+      summary: Синхронизировать пользователей Kaiten
+      description: |
+        Тянет всех пользователей из Kaiten API и bulk-upsert-ит в kaiten_user. 
+        Используется как ручной триггер, если расписание сбора пропустило обновления.
+      operationId: syncKaitenUsers
+      responses:
+        '200':
+          description: Пользователи успешно синхронизированы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResult'
+              example:
+                synced: 142
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+components:
+  schemas:
+    SyncResult:
+      type: object
+      required:
+        - synced
+      properties:
+        synced:
+          type: integer
+          format: int32
+          description: Количество синхронизированных пользователей
+          example: 142

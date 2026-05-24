@@ -1,0 +1,389 @@
+openapi: 3.0.3
+info:
+  title: Markable Dev Analytics - Users API
+  version: 1.0.0
+  description: API для работы с профилями пользователей и их коммитами
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Локальный сервер разработки
+  - url: https://api.markable.dev/api/v2
+    description: Продакшн сервер
+
+tags:
+  - name: Users
+    description: Профили и коммиты пользователей
+
+paths:
+  /users/{email}/profile:
+    get:
+      tags:
+        - Users
+      summary: Получить профиль пользователя
+      description: |
+        Профиль пользователя за период: запись в unified_user, агрегированный summary 
+        из daily stats, первые 500 коммитов и карточки Kaiten live (если у пользователя есть kaiten_id).
+        
+        Карточки Kaiten тянутся напрямую из Kaiten API при каждом запросе — не из локальной БД. 
+        Фильтр: карточки, обновлённые после from. Используется в основном кейсе «открыть профиль 
+        с дашборда», поэтому from/to тоже опциональны — без них берётся последние 30 дней.
+      operationId: getUserProfile
+      parameters:
+        - name: email
+          in: path
+          required: true
+          description: Email пользователя
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          example: "boris@x5.ru"
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+              example:
+                user:
+                  id: 42
+                  email: "boris@x5.ru"
+                  username: "boris"
+                  name: "Boris"
+                  avatarUrl: null
+                  kaitenId: 7
+                  gitlabId: null
+                summary:
+                  email: "boris@x5.ru"
+                  commits: 47
+                  mergeCommits: 3
+                  addedLines: 1820
+                  deletedLines: 850
+                  testAddedLines: 320
+                commits:
+                  - hash: "a1b2c3d4..."
+                    authorEmail: "boris@x5.ru"
+                    commitDate: "2026-05-10T12:00:00"
+                    merge: false
+                    addedLines: 42
+                    deletedLines: 7
+                    testAddedLines: 12
+                    message: "12345 fix the bug"
+                    taskNumber: "12345"
+                    repo: "xrg-core"
+                cards:
+                  - id: 12345
+                    title: "Fix the bug"
+                    description: "..."
+                    status: "in_progress"
+                    columnName: "In Progress"
+                    boardName: "Core"
+                    spaceName: "Engineering"
+                    ownerId: 7
+                    ownerName: "Boris"
+                    createdAt: "2026-05-01T10:00:00"
+                    updatedAt: "2026-05-10T12:00:00"
+                    closedAt: null
+                    archived: false
+                    url: "https://kaiten.x5.ru/12345"
+                    memberIds: [7]
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /users/{email}/commits:
+    get:
+      tags:
+        - Users
+      summary: Получить коммиты пользователя
+      description: Коммиты пользователя за период с пагинацией
+      operationId: getUserCommits
+      parameters:
+        - name: email
+          in: path
+          required: true
+          description: Email пользователя
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          example: "boris@x5.ru"
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+        - $ref: 'shared.yaml#/components/parameters/Page'
+        - $ref: 'shared.yaml#/components/parameters/Size'
+      responses:
+        '200':
+          description: Коммиты пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Commit'
+              example:
+                - hash: "a1b2c3d4..."
+                  authorEmail: "boris@x5.ru"
+                  commitDate: "2026-05-10T12:00:00"
+                  merge: false
+                  addedLines: 42
+                  deletedLines: 7
+                  testAddedLines: 12
+                  message: "12345 fix the bug"
+                  taskNumber: "12345"
+                  repo: "xrg-core"
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+components:
+  schemas:
+    UserProfile:
+      type: object
+      required:
+        - user
+        - summary
+        - commits
+        - cards
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+          description: Информация о пользователе
+        summary:
+          $ref: '#/components/schemas/AuthorStats'
+          description: Агрегированная статистика за период
+        commits:
+          type: array
+          description: Первые 500 коммитов за период
+          items:
+            $ref: '#/components/schemas/Commit'
+        cards:
+          type: array
+          description: Карточки Kaiten (live)
+          items:
+            $ref: '#/components/schemas/KaitenCard'
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - username
+        - name
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 42
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email пользователя
+        username:
+          type: string
+          description: Имя пользователя
+          example: "boris"
+        name:
+          type: string
+          description: Полное имя
+          example: "Boris"
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара
+          example: null
+        kaitenId:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID пользователя в Kaiten
+          example: 7
+        gitlabId:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID пользователя в GitLab
+          example: null
+
+    Commit:
+      type: object
+      required:
+        - hash
+        - authorEmail
+        - commitDate
+        - merge
+        - addedLines
+        - deletedLines
+        - testAddedLines
+        - message
+        - repo
+      properties:
+        hash:
+          type: string
+          description: Хеш коммита
+          example: "a1b2c3d4..."
+        authorEmail:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email автора
+        commitDate:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+          description: Дата коммита
+        merge:
+          type: boolean
+          description: Является ли merge коммитом
+          example: false
+        addedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк
+          example: 42
+        deletedLines:
+          type: integer
+          format: int64
+          description: Количество удалённых строк
+          example: 7
+        testAddedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк в тестах
+          example: 12
+        message:
+          type: string
+          description: Сообщение коммита
+          example: "12345 fix the bug"
+        taskNumber:
+          type: string
+          nullable: true
+          description: Номер задачи из сообщения коммита
+          example: "12345"
+        repo:
+          type: string
+          description: Название репозитория
+          example: "xrg-core"
+
+    KaitenCard:
+      type: object
+      required:
+        - id
+        - title
+        - status
+        - columnName
+        - boardName
+        - spaceName
+        - ownerId
+        - ownerName
+        - createdAt
+        - updatedAt
+        - archived
+        - url
+        - memberIds
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID карточки
+          example: 12345
+        title:
+          type: string
+          description: Заголовок карточки
+          example: "Fix the bug"
+        description:
+          type: string
+          nullable: true
+          description: Описание карточки
+          example: "..."
+        status:
+          type: string
+          description: Статус карточки
+          example: "in_progress"
+        columnName:
+          type: string
+          description: Название колонки
+          example: "In Progress"
+        boardName:
+          type: string
+          description: Название доски
+          example: "Core"
+        spaceName:
+          type: string
+          description: Название пространства
+          example: "Engineering"
+        ownerId:
+          type: integer
+          format: int64
+          description: ID владельца
+          example: 7
+        ownerName:
+          type: string
+          description: Имя владельца
+          example: "Boris"
+        createdAt:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+          description: Время создания
+        updatedAt:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+          description: Время обновления
+        closedAt:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+          nullable: true
+          description: Время закрытия
+          example: null
+        archived:
+          type: boolean
+          description: Архивирована ли карточка
+          example: false
+        url:
+          type: string
+          format: uri
+          description: URL карточки в Kaiten
+          example: "https://kaiten.x5.ru/12345"
+        memberIds:
+          type: array
+          description: ID участников
+          items:
+            type: integer
+            format: int64
+          example: [7]
+
+    AuthorStats:
+      type: object
+      required:
+        - email
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email разработчика
+        commits:
+          type: integer
+          format: int32
+          description: Количество коммитов
+          example: 47
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество merge коммитов
+          example: 3
+        addedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк
+          example: 1820
+        deletedLines:
+          type: integer
+          format: int64
+          description: Количество удалённых строк
+          example: 850
+        testAddedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк в тестах
+          example: 320

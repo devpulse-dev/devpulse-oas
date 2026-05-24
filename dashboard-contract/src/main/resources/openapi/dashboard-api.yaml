@@ -1,0 +1,148 @@
+openapi: 3.0.3
+info:
+  title: Markable Dev Analytics - Dashboard API
+  version: 1.0.0
+  description: API для дашборда с топ-N активных и аутсайдерами
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Локальный сервер разработки
+  - url: https://api.markable.dev/api/v2
+    description: Продакшн сервер
+
+tags:
+  - name: Dashboard
+    description: Дашборд с активностью разработчиков
+
+paths:
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Получить данные дашборда
+      description: |
+        Главный борд: топ-N самых активных + N «аутсайдеров» (наименее активные из тех, 
+        у кого хотя бы 1 коммит) за период.
+        
+        Если активных авторов меньше чем topN + outsiderN, списки могут пересекаться — 
+        это намеренно: «верх» и «низ» одного маленького списка.
+      operationId: getDashboard
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+        - name: topN
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Сколько активных вернуть
+          example: 10
+        - name: outsiderN
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Сколько аутсайдеров вернуть
+          example: 10
+      responses:
+        '200':
+          description: Данные дашборда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+              example:
+                from: "2026-04-23"
+                to: "2026-05-23"
+                topActive:
+                  - email: "boris@x5.ru"
+                    commits: 47
+                    mergeCommits: 3
+                    addedLines: 1820
+                    deletedLines: 850
+                    testAddedLines: 320
+                outsiders:
+                  - email: "junior@x5.ru"
+                    commits: 2
+                    mergeCommits: 0
+                    addedLines: 18
+                    deletedLines: 5
+                    testAddedLines: 0
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+components:
+  schemas:
+    Dashboard:
+      type: object
+      required:
+        - from
+        - to
+        - topActive
+        - outsiders
+      properties:
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Начало периода
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Конец периода
+        topActive:
+          type: array
+          description: Топ-N самых активных разработчиков
+          items:
+            $ref: '#/components/schemas/AuthorStats'
+        outsiders:
+          type: array
+          description: N наименее активных разработчиков (с хотя бы 1 коммитом)
+          items:
+            $ref: '#/components/schemas/AuthorStats'
+
+    AuthorStats:
+      type: object
+      required:
+        - email
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email разработчика
+        commits:
+          type: integer
+          format: int32
+          description: Количество коммитов
+          example: 47
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество merge коммитов
+          example: 3
+        addedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк
+          example: 1820
+        deletedLines:
+          type: integer
+          format: int64
+          description: Количество удалённых строк
+          example: 850
+        testAddedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк в тестах
+          example: 320

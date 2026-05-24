@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Markable Dev Analytics - Stats API
+  version: 1.0.0
+  description: API для получения статистики по разработчикам
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Локальный сервер разработки
+  - url: https://api.markable.dev/api/v2
+    description: Продакшн сервер
+
+tags:
+  - name: Stats
+    description: Статистика по разработчикам
+
+paths:
+  /stats/daily:
+    get:
+      tags:
+        - Stats
+      summary: Получить дневную статистику
+      description: |
+        Дневные агрегаты за период (по ключу email × date × repo).
+        
+        Параметры from и to — оба обязательны, ISO-формат YYYY-MM-DD, 
+        обе границы включительно. Если to < from — 400.
+      operationId: getDailyStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+      responses:
+        '200':
+          description: Дневная статистика
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DailyAuthorStats'
+              example:
+                - id: 12345
+                  email: "boris@x5.ru"
+                  date: "2026-05-10"
+                  repo: "xrg-core"
+                  commits: 3
+                  mergeCommits: 0
+                  addedLines: 124
+                  deletedLines: 58
+                  testAddedLines: 22
+                  lastUpdated: "2026-05-10T01:02:15"
+                  userId: 42
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /stats/weekly:
+    get:
+      tags:
+        - Stats
+      summary: Получить недельную статистику
+      description: |
+        Группировка по ISO-неделям, для каждой недели — totals и per-author breakdown. 
+        Список отсортирован по возрастанию weekStart.
+      operationId: getWeeklyStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+      responses:
+        '200':
+          description: Недельная статистика
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WeeklyStats'
+              example:
+                - year: 2026
+                  week: 19
+                  weekStart: "2026-05-04"
+                  totalCommits: 47
+                  totalMergeCommits: 3
+                  totalAddedLines: 1820
+                  totalDeletedLines: 850
+                  totalTestAddedLines: 320
+                  authors:
+                    - email: "boris@x5.ru"
+                      commits: 12
+                      mergeCommits: 1
+                      addedLines: 480
+                      deletedLines: 200
+                      testAddedLines: 90
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /stats/summary:
+    get:
+      tags:
+        - Stats
+      summary: Получить сводку за период
+      description: Сводка за период: totals + топ-10 авторов по убыванию коммитов
+      operationId: getSummaryStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+      responses:
+        '200':
+          description: Сводка за период
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryStats'
+              example:
+                from: "2026-05-01"
+                to: "2026-05-31"
+                totalCommits: 312
+                totalMergeCommits: 18
+                totalAddedLines: 12400
+                totalDeletedLines: 5800
+                totalTestAddedLines: 2120
+                uniqueAuthors: 14
+                topAuthors:
+                  - email: "boris@x5.ru"
+                    commits: 47
+                    mergeCommits: 3
+                    addedLines: 1820
+                    deletedLines: 850
+                    testAddedLines: 320
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+components:
+  schemas:
+    DailyAuthorStats:
+      type: object
+      required:
+        - id
+        - email
+        - date
+        - repo
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+        - lastUpdated
+        - userId
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID записи
+          example: 12345
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email разработчика
+        date:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Дата
+        repo:
+          type: string
+          description: Название репозитория
+          example: "xrg-core"
+        commits:
+          type: integer
+          format: int32
+          description: Количество коммитов
+          example: 3
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество merge коммитов
+          example: 0
+        addedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк
+          example: 124
+        deletedLines:
+          type: integer
+          format: int64
+          description: Количество удалённых строк
+          example: 58
+        testAddedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк в тестах
+          example: 22
+        lastUpdated:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+          description: Время последнего обновления
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 42
+
+    WeeklyStats:
+      type: object
+      required:
+        - year
+        - week
+        - weekStart
+        - totalCommits
+        - totalMergeCommits
+        - totalAddedLines
+        - totalDeletedLines
+        - totalTestAddedLines
+        - authors
+      properties:
+        year:
+          type: integer
+          format: int32
+          description: Год
+          example: 2026
+        week:
+          type: integer
+          format: int32
+          description: Номер недели (ISO)
+          example: 19
+        weekStart:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Начало недели
+        totalCommits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов
+          example: 47
+        totalMergeCommits:
+          type: integer
+          format: int32
+          description: Общее количество merge коммитов
+          example: 3
+        totalAddedLines:
+          type: integer
+          format: int64
+          description: Общее количество добавленных строк
+          example: 1820
+        totalDeletedLines:
+          type: integer
+          format: int64
+          description: Общее количество удалённых строк
+          example: 850
+        totalTestAddedLines:
+          type: integer
+          format: int64
+          description: Общее количество добавленных строк в тестах
+          example: 320
+        authors:
+          type: array
+          description: Статистика по авторам за неделю
+          items:
+            $ref: '#/components/schemas/AuthorStats'
+
+    SummaryStats:
+      type: object
+      required:
+        - from
+        - to
+        - totalCommits
+        - totalMergeCommits
+        - totalAddedLines
+        - totalDeletedLines
+        - totalTestAddedLines
+        - uniqueAuthors
+        - topAuthors
+      properties:
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Начало периода
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+          description: Конец периода
+        totalCommits:
+          type: integer
+          format: int32
+          description: Общее количество коммитов
+          example: 312
+        totalMergeCommits:
+          type: integer
+          format: int32
+          description: Общее количество merge коммитов
+          example: 18
+        totalAddedLines:
+          type: integer
+          format: int64
+          description: Общее количество добавленных строк
+          example: 12400
+        totalDeletedLines:
+          type: integer
+          format: int64
+          description: Общее количество удалённых строк
+          example: 5800
+        totalTestAddedLines:
+          type: integer
+          format: int64
+          description: Общее количество добавленных строк в тестах
+          example: 2120
+        uniqueAuthors:
+          type: integer
+          format: int32
+          description: Количество уникальных авторов
+          example: 14
+        topAuthors:
+          type: array
+          description: Топ-10 авторов по количеству коммитов
+          items:
+            $ref: '#/components/schemas/AuthorStats'
+
+    AuthorStats:
+      type: object
+      required:
+        - email
+        - commits
+        - mergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email разработчика
+        commits:
+          type: integer
+          format: int32
+          description: Количество коммитов
+          example: 47
+        mergeCommits:
+          type: integer
+          format: int32
+          description: Количество merge коммитов
+          example: 3
+        addedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк
+          example: 1820
+        deletedLines:
+          type: integer
+          format: int64
+          description: Количество удалённых строк
+          example: 850
+        testAddedLines:
+          type: integer
+          format: int64
+          description: Количество добавленных строк в тестах
+          example: 320
