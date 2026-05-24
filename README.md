@@ -1,16 +1,16 @@
-# 📊 Markable Dev Analytics OpenAPI Contracts
+# 📊 DevPulse OpenAPI Contracts
 
 > Централизованное хранилище OpenAPI контрактов для Markable Dev Analytics — сервиса аналитики активности разработчиков
 
-[![GitHub Actions](https://github.com/dev-Markable/markable-dev-analytics-oas/actions/workflows/deploy.yml/badge.svg)](https://github.com/dev-Markable/markable-dev-analytics-oas/actions)
-[![GitHub Packages](https://img.shields.io/badge/GitHub-Packages-blue)](https://github.com/dev-Markable/markable-dev-analytics-oas/packages)
+[![GitHub Actions](https://github.com/devpulse-dev/devpulse-oas/actions/workflows/deploy.yml/badge.svg)](https://github.com/devpulse-dev/devpulse-oas/actions)
+[![GitHub Packages](https://img.shields.io/badge/GitHub-Packages-blue)](https://github.com/devpulse-dev/devpulse-oas/packages)
 [![Java 25](https://img.shields.io/badge/Java-25-red.svg)](https://openjdk.org/projects/jdk/25/)
 [![OpenAPI 3.0](https://img.shields.io/badge/OpenAPI-3.0-green.svg)](https://swagger.io/specification/)
 
 ## 📁 Структура проекта
 
 ```text
-markable-dev-analytics-oas/
+devpulse-oas/
 ├── shared-contract/      # Общие типы и компоненты
 ├── collection-contract/  # Контракты для управления сбором данных
 ├── dashboard-contract/    # Контракты для дашборда
@@ -38,8 +38,8 @@ markable-dev-analytics-oas/
 ### 1. Клонирование проекта
 
 ```bash
-git clone https://github.com/dev-Markable/markable-dev-analytics-oas.git
-cd markable-dev-analytics-oas
+git clone https://github.com/devpulse-dev/devpulse-oas.git
+cd devpulse-oas
 ```
 
 ### 2. Использование в проектах
@@ -51,7 +51,7 @@ cd markable-dev-analytics-oas
     <repository>
         <id>github</id>
         <name>GitHub Packages</name>
-        <url>https://maven.pkg.github.com/dev-Markable/markable-dev-analytics-oas</url>
+        <url>https://maven.pkg.github.com/devpulse-dev/devpulse-oas</url>
     </repository>
 </repositories>
 
@@ -197,5 +197,5 @@ GitHub Actions workflow в [`.github/workflows/deploy.yml`](.github/workflows/de
 
 ## 📞 Контакты
 
-- GitHub: [dev-Markable](https://github.com/dev-Markable)
-- Issues: [GitHub Issues](https://github.com/dev-Markable/markable-dev-analytics-oas/issues)
+- GitHub: [devpulse-dev](https://github.com/devpulse-dev)
+- Issues: [GitHub Issues](https://github.com/devpulse-dev/devpulse-oas/issues)
