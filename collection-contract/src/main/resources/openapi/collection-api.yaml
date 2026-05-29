@@ -21,9 +21,13 @@ paths:
         - Collection
       summary: Запустить сбор данных
       description: |
-        Запускает полный цикл сбора: git → daily stats → (изолированно) sync Kaiten users 
-        (обновление kaitenId/avatarUrl в unified_user). Карточки Kaiten НЕ выкачиваются — 
-        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат (SUCCESS или FAILED).
+        Запускает полный цикл сбора: git → daily stats → (изолированно) sync Kaiten users
+        (обновление kaitenId/avatarUrl в unified_user). Карточки Kaiten НЕ выкачиваются —
+        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат
+        (SUCCESS или FAILED).
+
+        Один сбор за раз: распределённый mutex через PostgreSQL pg_try_advisory_lock.
+        Если в момент запроса уже идёт другой прогон — сразу возвращается 409, без ожидания.
       operationId: startCollectionRun
       requestBody:
         description: Опциональные параметры запуска сбора
@@ -45,12 +49,27 @@ paths:
                 id: "f1a4c0d2-..."
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
-                sinceDate: "2026-05-10"
-                untilDate: "2026-05-23"
+                sinceDate: "2026-05-10T00:00:00"
+                untilDate: "2026-05-23T14:00:00"
                 status: "SUCCESS"
                 errorMessage: null
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
+        '409':
+          description: |
+            Сбор уже идёт. Распределённый mutex через pg_try_advisory_lock не пускает
+            параллельный POST. Клиент может опросить GET /collection/runs/{id} для
+            текущего прогона или повторить запрос после его завершения.
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+              example:
+                type: "urn:devpulse:problem:collection-in-progress"
+                title: "Collection already in progress"
+                status: 409
+                detail: "Another collection run is in progress. Wait for it to finish or query its status via GET /api/v2/collection/runs/{id}."
+                instance: "/api/v2/collection/runs"
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
@@ -79,8 +98,8 @@ paths:
                 id: "f1a4c0d2-..."
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
-                sinceDate: "2026-05-10"
-                untilDate: "2026-05-23"
+                sinceDate: "2026-05-10T00:00:00"
+                untilDate: "2026-05-23T14:00:00"
                 status: "SUCCESS"
                 errorMessage: null
         '404':

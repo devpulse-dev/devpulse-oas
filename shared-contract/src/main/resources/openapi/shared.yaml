@@ -2,7 +2,17 @@ openapi: 3.0.3
 info:
   title: DevPulse - Shared Components
   version: 1.0.0
-  description: Общие схемы и компоненты для всех API модулей
+  description: |
+    Общие схемы и компоненты для всех API модулей. Это не самостоятельный API —
+    модуль используется только как target для $ref из остальных контрактов
+    (`shared.yaml#/components/...`).
+
+# Заглушки, требуемые спецификацией OpenAPI 3.0.3 — реальных эндпоинтов в этом
+# модуле нет, он публикует только компоненты.
+servers:
+  - url: /
+    description: Not a real API — components library
+paths: {}
 
 components:
   schemas:
@@ -178,6 +188,68 @@ components:
           format: int32
           description: Количество добавленных строк в тестах
           example: 320
+        activity:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ActivityScore'
+          description: |
+            Композитная метрика активности. Заполнена только на /dashboard
+            (по ней идёт сортировка). На /stats/weekly и /stats/summary — всегда null.
+            На /stats/daily используется другой тип (DailyStats), где этого поля нет.
+
+    # Activity Score — композитная метрика активности для дашборда
+    ActivityScore:
+      type: object
+      required:
+        - score
+        - category
+        - volumeFactor
+        - qualityFactor
+        - avgLinesPerCommit
+      properties:
+        score:
+          type: number
+          format: double
+          description: |
+            Финальный score: volumeFactor × qualityFactor.
+            1.0 ≈ норма команды. Используется для сортировки на /dashboard.
+          example: 0.92
+        category:
+          type: string
+          enum: [INACTIVE, BELOW_AVERAGE, ACTIVE, STAR]
+          description: |
+            Категория активности по порогам score:
+              - INACTIVE: score < 0.2
+              - BELOW_AVERAGE: 0.2 ≤ score < 0.6
+              - ACTIVE: 0.6 ≤ score < 1.5
+              - STAR: score ≥ 1.5
+          example: "ACTIVE"
+        volumeFactor:
+          type: number
+          format: double
+          description: |
+            Объём активности: nonMergeCommits / expectedCommits.
+            Baseline expectedCommits = 50 коммитов / 30 дней, масштабируется под
+            длину запрошенного периода. Настраивается на бэке через
+            scoring.expected-commits-per-30-days в application.yml.
+          example: 0.92
+        qualityFactor:
+          type: number
+          format: double
+          minimum: 0.3
+          maximum: 1.0
+          description: |
+            Качество коммитов: 0.3..1.0 от среднего числа строк на коммит.
+              - 10..200 строк/коммит = 1.0 (здорово)
+              - < 5 строк = штраф (микро-коммиты)
+              - > 500 строк = штраф (бомбы)
+          example: 1.0
+        avgLinesPerCommit:
+          type: number
+          format: double
+          description: Среднее число строк на коммит за период (для тултипа на фронте)
+          example: 47.5
 
     # Прогон сбора данных
     CollectionRun:
@@ -197,9 +269,9 @@ components:
         finishedAt:
           $ref: '#/components/schemas/DateTime'
         sinceDate:
-          $ref: '#/components/schemas/Date'
+          $ref: '#/components/schemas/DateTime'
         untilDate:
-          $ref: '#/components/schemas/Date'
+          $ref: '#/components/schemas/DateTime'
         status:
           type: string
           enum: [RUNNING, SUCCESS, FAILED]
@@ -240,7 +312,11 @@ components:
           $ref: '#/components/schemas/Email'
         username:
           type: string
-          description: Имя пользователя
+          nullable: true
+          description: |
+            Имя пользователя из Kaiten. null, если автор не связан с Kaiten
+            (внешний контрибьютор / сервисный аккаунт) — фронт должен
+            использовать email или часть до @ как fallback.
           example: "boris"
         name:
           type: string
@@ -327,8 +403,11 @@ components:
       required:
         - id
         - title
-        - status
-        - columnName
+        - typeId
+        - cardType
+        - columnType
+        - columnStatus
+        - columnTitle
         - boardName
         - spaceName
         - ownerId
@@ -336,13 +415,14 @@ components:
         - createdAt
         - updatedAt
         - archived
+        - closed
         - url
         - memberIds
       properties:
         id:
           type: integer
           format: int64
-          description: ID карточки
+          description: ID карточки Kaiten
           example: 12345
         title:
           type: string
@@ -353,14 +433,39 @@ components:
           nullable: true
           description: Описание карточки
           example: "..."
-        status:
+        typeId:
+          type: integer
+          format: int64
+          description: Сырой id типа карточки в Kaiten (значение поля type_id из Kaiten API)
+          example: 70
+        cardType:
           type: string
-          description: Статус карточки
-          example: "in_progress"
-        columnName:
+          enum: [DEVELOPMENT, DEFECT, OTHER]
+          description: |
+            Наша классификация типа карточки, derived из typeId:
+              - DEVELOPMENT — typeId == 70
+              - DEFECT — typeId == 8
+              - OTHER — всё остальное
+          example: "DEVELOPMENT"
+        columnType:
+          type: integer
+          format: int32
+          description: Сырой код колонки из Kaiten API (column.type), значения 1/2/3
+          example: 2
+        columnStatus:
           type: string
-          description: Название колонки
-          example: "In Progress"
+          enum: [NEW, IN_PROGRESS, DONE, UNKNOWN]
+          description: |
+            Статус задачи, derived из columnType:
+              - NEW — columnType == 1
+              - IN_PROGRESS — columnType == 2
+              - DONE — columnType == 3
+              - UNKNOWN — иное значение
+          example: "IN_PROGRESS"
+        columnTitle:
+          type: string
+          description: Человекочитаемое название колонки (значение column.title из Kaiten API)
+          example: "В уточнении"
         boardName:
           type: string
           description: Название доски
@@ -383,11 +488,22 @@ components:
         updatedAt:
           $ref: '#/components/schemas/DateTime'
         closedAt:
-          $ref: '#/components/schemas/DateTime'
+          type: string
+          format: date-time
           nullable: true
+          description: Момент закрытия карточки. null, если карточка не закрыта.
         archived:
           type: boolean
-          description: Архивирована ли карточка
+          description: |
+            Карточка скрыта на доске. ВАЖНО: archived НЕ значит «задача завершена» — это
+            просто видимость на доске. Для определения «закрыта/нет» используйте поле
+            closed (или columnStatus == DONE), НЕ archived.
+          example: false
+        closed:
+          type: boolean
+          description: |
+            Производное поле: closed = (columnStatus == DONE) || (closedAt != null).
+            Канонический способ узнать «закрыта ли задача».
           example: false
         url:
           type: string
