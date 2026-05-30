@@ -69,8 +69,8 @@ paths:
               schema:
                 $ref: 'shared.yaml#/components/schemas/ProblemDetails'
               example:
-                type: "urn:devpulse:problem:collection-in-progress"
-                title: "Collection already in progress"
+                type: "urn:devpulse:problem:conflict"
+                title: "Collection already running"
                 status: 409
                 detail: "Another collection run is in progress. Wait for it to finish or query its status via GET /api/v2/collection/runs/{id}."
                 instance: "/api/v2/collection/runs"

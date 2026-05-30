@@ -46,8 +46,8 @@ paths:
               schema:
                 $ref: 'shared.yaml#/components/schemas/ProblemDetails'
               example:
-                type: "urn:devpulse:problem:kaiten-upstream"
-                title: "Kaiten upstream error"
+                type: "urn:devpulse:problem:upstream-error"
+                title: "Upstream service error"
                 status: 502
                 detail: "Kaiten API returned 503 — sync aborted, no partial state persisted."
                 instance: "/api/v2/kaiten/sync-users"

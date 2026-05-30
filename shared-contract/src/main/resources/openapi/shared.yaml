@@ -106,6 +106,10 @@ components:
 
     PageResponse:
       type: object
+      description: |
+        Generic paginated wrapper. Не используется напрямую в текущих эндпоинтах
+        (каждый домен расписывает свой <DomainResponse> с конкретным items[]),
+        оставлен как шаблон для будущих paginated ручек.
       required:
         - content
         - page
@@ -116,6 +120,9 @@ components:
         content:
           type: array
           description: Содержимое страницы
+          items:
+            type: object
+            description: Любая модель домена. Подменяется конкретным типом при наследовании.
         page:
           type: integer
           format: int32
