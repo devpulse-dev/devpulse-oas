@@ -6,6 +6,7 @@
 [![GitHub Packages](https://img.shields.io/badge/GitHub-Packages-blue)](https://github.com/devpulse-dev/devpulse-oas/packages)
 [![Java 25](https://img.shields.io/badge/Java-25-red.svg)](https://openjdk.org/projects/jdk/25/)
 [![OpenAPI 3.0](https://img.shields.io/badge/OpenAPI-3.0-green.svg)](https://swagger.io/specification/)
+[![npm](https://img.shields.io/badge/npm-@devpulse--dev-blue.svg)](https://github.com/devpulse-dev/devpulse-oas/packages)
 
 ## 📁 Структура проекта
 
@@ -22,16 +23,31 @@ devpulse-oas/
 └── README.md
 ```
 
-## 🏗️ Модули
+## 🏗️ Дистрибуция
 
-| Модуль | Описание | Версия |
-|--------|----------|--------|
-| **shared-contract** | Общие схемы (UUID, DateTime, Error), security схемы, типы данных | `1.0.0` |
-| **collection-contract** | API для управления сбором данных из Git и Kaiten | `1.0.0` |
-| **dashboard-contract** | API для дашборда с пагинацией авторов | `1.0.0` |
-| **stats-contract** | API для получения статистики по разработчикам | `1.0.0` |
-| **users-contract** | API для работы с профилями пользователей и их коммитами | `1.0.0` |
-| **kaiten-contract** | API для интеграции с Kaiten | `1.0.0` |
+Один источник правды (YAML-спеки) публикуется в двух форматах:
+
+- **Backend** — 6 Maven JAR с YAML внутри (по модулю на bounded context). Бэк
+  генерит Spring-интерфейсы через `openapi-generator-maven-plugin`.
+- **Frontend** — один npm-пакет `@devpulse-dev/api-types` с готовыми `.d.ts` на
+  весь `/api/v2`. Кодогенерации на стороне фронта не требуется. См. [`FRONTEND.md`](FRONTEND.md).
+
+### Maven-модули (backend)
+
+| Модуль | Maven Artifact | Описание | Версия |
+|--------|----------------|----------|--------|
+| **shared-contract** | `com.devpulse:shared-contract` | Общие схемы (UUID, DateTime, Error), security схемы, типы данных | `1.0.0` |
+| **collection-contract** | `com.devpulse:collection-contract` | API для управления сбором данных из Git и Kaiten | `1.0.0` |
+| **dashboard-contract** | `com.devpulse:dashboard-contract` | API для дашборда с пагинацией авторов | `1.0.0` |
+| **stats-contract** | `com.devpulse:stats-contract` | API для получения статистики по разработчикам | `1.0.0` |
+| **users-contract** | `com.devpulse:users-contract` | API для работы с профилями пользователей и их коммитами | `1.0.0` |
+| **kaiten-contract** | `com.devpulse:kaiten-contract` | API для интеграции с Kaiten | `1.0.0` |
+
+### npm-пакет (frontend)
+
+| Пакет | Содержимое | Версия |
+|-------|------------|--------|
+| **`@devpulse-dev/api-types`** | TypeScript-типы (`components`/`paths`/`operations`) + bundled `openapi.json` на весь API | `1.0.0` |
 
 ## 🚀 Быстрый старт
 
@@ -89,20 +105,52 @@ cd devpulse-oas
 </dependencies>
 ```
 
-### 3. Сборка проекта
+### 2.1 Использование в React + TypeScript проектах
+
+Фронтенд ставит один пакет с готовыми типами:
 
 ```bash
-# Сборка конкретного модуля
-cd collection-contract
+npm install -D @devpulse-dev/api-types
+```
+
+`.npmrc` (только scoped-registry — глобальный `registry=` НЕ добавлять):
+
+```ini
+@devpulse-dev:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+```typescript
+import type { components } from '@devpulse-dev/api-types';
+type DashboardResponse = components['schemas']['DashboardResponse'];
+```
+
+Подробная документация для фронтенда: [`FRONTEND.md`](FRONTEND.md)
+
+### 3. Сборка проекта
+
+Корневой `pom.xml` — parent + aggregator, реактор сам ставит `shared-contract` первым.
+
+```bash
+# Сборка всех модулей (parent + 6)
 mvn clean install
 
-# Сборка всех модулей (по очереди)
-for module in shared-contract collection-contract dashboard-contract stats-contract users-contract kaiten-contract; do
-    cd $module
-    mvn clean install
-    cd ..
-done
+# Один модуль + его зависимости
+mvn -pl dashboard-contract -am clean install
+
+# npm-пакет с TS-типами для фронта
+cd api-types && npm install && npm run build
 ```
+
+### Версионирование (lockstep)
+
+Единый источник версии — свойство `<revision>` в корневом [`pom.xml`](pom.xml).
+Меняешь его → едут все 6 Maven-артефактов **и** npm `@devpulse-dev/api-types`
+(его версия деривится из `<revision>` скриптом `api-types/scripts/build-types.mjs`).
+
+Semver: additive = minor, breaking = major, доки = patch. Релиз:
+правишь `<revision>` → `mvn clean install` + `cd api-types && npm run build` →
+коммит → запуск deploy-workflow.
 
 ### 4. Деплой через GitHub Actions
 
@@ -182,9 +230,16 @@ collection-contract/
 
 GitHub Actions workflow в [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
-- Автоматическая сборка и публикация в GitHub Packages
+- Автоматическая сборка и публикация в GitHub Packages (Maven JAR + npm)
 - Валидация OpenAPI спецификаций
 - Тестирование контрактов
+- Публикация контрактов в двух форматах:
+  - **Maven JAR** (6 модулей) — для Java бэкенда
+  - **npm `@devpulse-dev/api-types`** (один пакет, готовые `.d.ts`) — для React + TypeScript фронтенда
+
+npm-пакет (re)публикуется при каждом запуске workflow и идемпотентен: если такая
+версия уже в registry — шаг пропускает `npm publish` (нужен bump `version` в
+[`api-types/package.json`](api-types/package.json)).
 
 ## 🤝 Вклад в проект
 
