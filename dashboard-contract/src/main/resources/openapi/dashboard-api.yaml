@@ -40,7 +40,18 @@ paths:
         - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
         - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
         - $ref: 'shared.yaml#/components/parameters/Page'
-        - $ref: 'shared.yaml#/components/parameters/Size'
+        # size с дашборд-специфичным дефолтом 20 (общий Size в shared имеет 50).
+        # 20 — оптимально для одной строки экрана с карточками авторов.
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 20
+            minimum: 1
+            maximum: 500
+          description: Размер страницы (default 20 — оптимально для одного экрана авторов)
       responses:
         '200':
           description: Данные дашборда
