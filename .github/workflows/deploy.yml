@@ -1,21 +1,10 @@
 name: 🚀 Deploy Contracts
 
+# Lockstep-релиз (Approach A): весь contracts-репо едет под одной версией
+# (parent pom <revision>). Деплоит parent + 6 Maven-модулей + npm api-types за раз.
+# Версию бампать в pom.xml → <revision>.
 on:
   workflow_dispatch:
-    inputs:
-      module:
-        description: 'Module to deploy'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - shared-contract
-          - collection-contract
-          - dashboard-contract
-          - stats-contract
-          - users-contract
-          - kaiten-contract
 
 jobs:
   deploy:
@@ -35,48 +24,52 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Deploy shared-contract first (if needed)
-        if: inputs.module == 'all' || inputs.module == 'shared-contract'
+      # ─────────────────────────── Maven (backend JARs) ───────────────────────────
+      # Один root-деплой: реактор сам ставит shared-contract первым (он зависимость
+      # остальных) и публикует parent pom (нужен потребителям для резолва дочерних).
+
+      - name: Deploy Maven contracts (parent + 6 modules)
         run: |
-          echo "📦 Deploying shared-contract (base dependency)..."
-          cd shared-contract
+          REVISION=$(mvn -q -N help:evaluate -Dexpression=revision -DforceStdout)
+          echo "📦 Deploying DevPulse contracts v${REVISION} (lockstep)..."
           mvn -B clean deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy selected module(s)
+      # ──────────────────────── npm (frontend api-types) ──────────────────────────
+      # Единый пакет @devpulse-dev/api-types на весь /api/v2. Версия деривится из
+      # того же pom <revision> (build-types.mjs синхронизирует package.json).
+      # Идемпотентно: если версия уже в registry — publish пропускается.
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@devpulse-dev'
+
+      - name: Publish frontend api-types (npm)
         run: |
-          echo "🚀 Deploying ${{ inputs.module }}..."
-          
-          case "${{ inputs.module }}" in
-            "all")
-              echo "📦 Deploying all modules..."
-              # shared уже задеплоен, деплоим остальные
-              for module in collection-contract dashboard-contract stats-contract users-contract kaiten-contract; do
-                echo "📦 Deploying $module..."
-                cd "$module"
-                mvn -B clean deploy -DskipTests
-                cd ..
-              done
-              ;;
-            "shared-contract")
-              echo "✅ shared-contract already deployed in previous step"
-              ;;
-            *)
-              echo "📦 Deploying ${{ inputs.module }}..."
-              cd "${{ inputs.module }}"
-              mvn -B clean deploy -DskipTests
-              ;;
-          esac
+          cd api-types
+          npm install --no-audit --no-fund
+          npm run build            # генерит dist/ + синхронит package.json version из pom <revision>
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@devpulse-dev/api-types@${VERSION}" version >/dev/null 2>&1; then
+            echo "⏭️  @devpulse-dev/api-types@${VERSION} уже опубликован — пропускаю (бампни <revision> для релиза)."
+          else
+            echo "📦 Publishing @devpulse-dev/api-types@${VERSION}..."
+            npm publish
+          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Success summary
         run: |
-          echo "✅ DEPLOYMENT SUCCESSFUL!"
-          echo "📦 Module(s): ${{ inputs.module }}"
+          REVISION=$(node -p "require('./api-types/package.json').version")
+          echo "✅ DEPLOYMENT SUCCESSFUL — DevPulse contracts v${REVISION}"
           echo "👤 Triggered by: ${{ github.actor }}"
-          echo "📅 Timestamp: $(date)"
+          echo "📅 $(date)"
           echo ""
-          echo "📊 Packages available at:"
-          echo "https://github.com/devpulse-dev/devpulse-oas/packages"
+          echo "📊 Packages: https://github.com/devpulse-dev/devpulse-oas/packages"
+          echo "🔧 Maven (backend): com.devpulse:{shared,collection,dashboard,stats,users,kaiten}-contract:${REVISION}"
+          echo "⚛️  npm (frontend):  @devpulse-dev/api-types@${REVISION}"
