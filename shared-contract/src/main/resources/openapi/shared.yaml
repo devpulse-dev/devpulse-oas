@@ -302,13 +302,14 @@ components:
     # Профиль пользователя
     UserProfile:
       type: object
+      description: |
+        Запись unified_user. id и email — единственные гарантированно non-null поля
+        (естественные ключи). username/name/avatarUrl/kaitenId/gitlabId — nullable,
+        потому что у автора без Kaiten-учётки они пустые (внешний контрибьютор,
+        сервисный аккаунт, ещё не прошла синхронизация).
       required:
         - id
         - email
-        - username
-        - name
-        - kaitenId
-        - gitlabId
       properties:
         id:
           type: integer
