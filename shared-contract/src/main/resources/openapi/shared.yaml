@@ -167,32 +167,35 @@ components:
           example: "https://kaiten.x5.ru/avatars/42.png"
         commits:
           type: integer
-          format: int32
-          description: Общее количество коммитов (включая мерджи)
+          format: int64
+          description: |
+            Общее количество коммитов (включая мерджи).
+            int64 — потому что на больших monorepo'ах за длинный период значения могут
+            превысить 2^31. См. OAS-2 review в devpulse README.
           example: 50
         mergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Количество мердж-коммитов
           example: 5
         nonMergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Количество не-мердж коммитов (commits - mergeCommits)
           example: 45
         addedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк
           example: 1820
         deletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество удалённых строк
           example: 850
         testAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк в тестах
           example: 320
         activity:
@@ -378,17 +381,17 @@ components:
           example: false
         addedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк
           example: 42
         deletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество удалённых строк
           example: 7
         testAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк в тестах
           example: 12
         message:
@@ -541,27 +544,27 @@ components:
           $ref: '#/components/schemas/Email'
         commits:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество коммитов
           example: 47
         mergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Количество мердж-коммитов
           example: 3
         addedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк
           example: 1820
         deletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество удалённых строк
           example: 850
         testAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк в тестах
           example: 320
 
@@ -596,27 +599,27 @@ components:
           example: "xrg-core"
         commits:
           type: integer
-          format: int32
+          format: int64
           description: Количество коммитов
           example: 3
         mergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Количество мердж-коммитов
           example: 0
         addedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк
           example: 124
         deletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество удалённых строк
           example: 58
         testAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Количество добавленных строк в тестах
           example: 22
         lastUpdated:
@@ -655,27 +658,27 @@ components:
           $ref: '#/components/schemas/Date'
         totalCommits:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество коммитов за неделю
           example: 47
         totalMergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество мердж-коммитов за неделю
           example: 3
         totalAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество добавленных строк за неделю
           example: 1820
         totalDeletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество удалённых строк за неделю
           example: 850
         totalTestAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество добавленных строк в тестах за неделю
           example: 320
         authors:
@@ -704,27 +707,27 @@ components:
           $ref: '#/components/schemas/Date'
         totalCommits:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество коммитов за период
           example: 312
         totalMergeCommits:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество мердж-коммитов за период
           example: 18
         totalAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество добавленных строк за период
           example: 12400
         totalDeletedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество удалённых строк за период
           example: 5800
         totalTestAddedLines:
           type: integer
-          format: int32
+          format: int64
           description: Общее количество добавленных строк в тестах за период
           example: 2120
         uniqueAuthors:
