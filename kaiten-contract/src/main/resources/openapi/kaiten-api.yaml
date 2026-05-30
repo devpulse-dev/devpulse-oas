@@ -14,6 +14,10 @@ tags:
   - name: Kaiten
     description: Интеграция с Kaiten
 
+# Auth handled outside the contract (gateway / SSO). API exposes no
+# operation-level security requirements.
+security: []
+
 paths:
   /kaiten/sync-users:
     post:
@@ -33,5 +37,19 @@ paths:
                 $ref: 'shared.yaml#/components/schemas/KaitenSyncResponse'
               example:
                 synced: 142
+        '502':
+          description: |
+            Upstream Kaiten API недоступен или вернул ошибку. Бэк не смог завершить sync.
+            Стоит повторить запрос позже.
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+              example:
+                type: "urn:devpulse:problem:kaiten-upstream"
+                title: "Kaiten upstream error"
+                status: 502
+                detail: "Kaiten API returned 503 — sync aborted, no partial state persisted."
+                instance: "/api/v2/kaiten/sync-users"
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'

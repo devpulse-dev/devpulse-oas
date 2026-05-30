@@ -14,6 +14,10 @@ tags:
   - name: Stats
     description: Статистика по разработчикам
 
+# Auth handled outside the contract (gateway / SSO). API exposes no
+# operation-level security requirements.
+security: []
+
 paths:
   /stats/daily:
     get:

@@ -14,6 +14,10 @@ tags:
   - name: Collection
     description: Управление сбором данных
 
+# Auth handled outside the contract (gateway / SSO). API exposes no
+# operation-level security requirements.
+security: []
+
 paths:
   /collection/runs:
     post:
@@ -46,7 +50,7 @@ paths:
               schema:
                 $ref: 'shared.yaml#/components/schemas/CollectionRun'
               example:
-                id: "f1a4c0d2-..."
+                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
                 sinceDate: "2026-05-10T00:00:00"
@@ -95,7 +99,7 @@ paths:
               schema:
                 $ref: 'shared.yaml#/components/schemas/CollectionRun'
               example:
-                id: "f1a4c0d2-..."
+                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
                 startedAt: "2026-05-23T14:00:00"
                 finishedAt: "2026-05-23T14:00:42"
                 sinceDate: "2026-05-10T00:00:00"
