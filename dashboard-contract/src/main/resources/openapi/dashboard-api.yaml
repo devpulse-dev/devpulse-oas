@@ -14,6 +14,10 @@ tags:
   - name: Dashboard
     description: Дашборд с активностью разработчиков
 
+# Auth handled outside the contract (gateway / SSO). API exposes no
+# operation-level security requirements.
+security: []
+
 paths:
   /dashboard:
     get:
@@ -22,11 +26,15 @@ paths:
       summary: Получить данные дашборда
       description: |
         Главный борд: paginated список всех активных авторов за период (имеющих ≥ 1 коммит).
-        Отсортирован по убыванию не-мердж коммитов (commits − mergeCommits) — отражает «реальную работу», 
-        мерджи не накручивают позицию в топе.
-        
-        Фронт может показать первую страницу как «топ» и последнюю как «аутсайдеры». 
-        Раздельных секций в API больше нет — один list + pagination.
+        Отсортирован по убыванию activity.score — композитной метрики (см. ActivityScore
+        в shared.yaml). Только на этом эндпоинте AuthorSummary.activity заполнен —
+        на /stats/weekly и /stats/summary он всегда null.
+
+        Если from/to опущены — бэк подставляет последние 30 дней (today-30..today).
+
+        Фронт может показать первую страницу как «топ», а последнюю — как «аутсайдеры»
+        (или фильтровать по activity.category in {INACTIVE, BELOW_AVERAGE}). Раздельных
+        секций в API больше нет — один list + pagination.
       operationId: getDashboard
       parameters:
         - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
@@ -58,6 +66,12 @@ paths:
                     addedLines: 1820
                     deletedLines: 850
                     testAddedLines: 320
+                    activity:
+                      score: 0.92
+                      category: "ACTIVE"
+                      volumeFactor: 0.92
+                      qualityFactor: 1.0
+                      avgLinesPerCommit: 47.5
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':

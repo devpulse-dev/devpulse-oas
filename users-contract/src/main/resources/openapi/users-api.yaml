@@ -14,6 +14,10 @@ tags:
   - name: Users
     description: Профили и коммиты пользователей
 
+# Auth handled outside the contract (gateway / SSO). API exposes no
+# operation-level security requirements.
+security: []
+
 paths:
   /users/{email}/profile:
     get:
@@ -21,12 +25,18 @@ paths:
         - Users
       summary: Получить профиль пользователя
       description: |
-        Профиль пользователя за период: запись в unified_user, агрегированный summary из daily stats, 
-        первые 500 коммитов и карточки Kaiten live (если у пользователя есть kaiten_id).
-        
-        Карточки Kaiten тянутся напрямую из Kaiten API при каждом запросе — не из локальной БД. 
-        Фильтр: карточки, обновлённые после from. Используется в основном кейсе «открыть профиль с дашборда», 
-        поэтому from/to тоже опциональны — без них берётся последние 30 дней.
+        Профиль пользователя за период: запись в unified_user, агрегированный summary из
+        daily stats, первые 500 коммитов и карточки Kaiten live (если у пользователя есть
+        kaiten_id).
+
+        Карточки Kaiten тянутся напрямую из Kaiten API (не из локальной БД), с Caffeine-
+        кэшем TTL 5 минут. Успешный POST /collection/runs инвалидирует кэш. Фильтр на
+        бэке: в cards[] остаются только карточки, по которым (а) есть коммит автора за
+        период, ИЛИ (б) карточка не закрыта (columnStatus != DONE и closedAt == null).
+        Закрытые карточки без коммитов автора отсеиваются.
+
+        from/to опциональны — без них берётся последние 30 дней (основной кейс «открыть
+        профиль с дашборда»).
       operationId: getUserProfile
       parameters:
         - name: email
@@ -75,8 +85,11 @@ paths:
                   - id: 12345
                     title: "Fix the bug"
                     description: "..."
-                    status: "in_progress"
-                    columnName: "In Progress"
+                    typeId: 70
+                    cardType: "DEVELOPMENT"
+                    columnType: 2
+                    columnStatus: "IN_PROGRESS"
+                    columnTitle: "В уточнении"
                     boardName: "Core"
                     spaceName: "Engineering"
                     ownerId: 7
@@ -85,6 +98,7 @@ paths:
                     updatedAt: "2026-05-10T12:00:00"
                     closedAt: null
                     archived: false
+                    closed: false
                     url: "https://kaiten.x5.ru/12345"
                     memberIds: [7]
         '404':
