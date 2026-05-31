@@ -104,6 +104,60 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /stats/hourly:
+    get:
+      tags:
+        - Stats
+      summary: Получить почасовую статистику
+      description: |
+        Почасовая агрегация не-мердж коммитов за период по ключу (день недели × час) —
+        матрица 7×24 для heatmap «паттерны работы по часам/дням».
+
+        Агрегацию делает БД (GROUP BY по дню недели и часу), чтобы не поднимать тысячи
+        коммитов на клиент. Пустые ячейки (0 коммитов) могут опускаться — клиент
+        достраивает полную сетку.
+
+        Параметр email опционален: с ним — один автор (для профиля), без него — вся
+        команда (для Activity-страницы).
+      operationId: getHourlyStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: email
+          in: query
+          required: false
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email автора для фильтрации. Без параметра — агрегат по всей команде.
+          example: "boris@x5.ru"
+      responses:
+        '200':
+          description: Почасовая статистика
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/HourlyStats'
+              example:
+                from: "2026-05-01"
+                to: "2026-05-31"
+                cells:
+                  - weekday: 0
+                    hour: 10
+                    commits: 12
+                    addedLines: 540
+                  - weekday: 2
+                    hour: 14
+                    commits: 7
+                    addedLines: 320
+                  - weekday: 5
+                    hour: 23
+                    commits: 2
+                    addedLines: 40
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
   /stats/summary:
     get:
       tags:
