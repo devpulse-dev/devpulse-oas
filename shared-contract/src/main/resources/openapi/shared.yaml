@@ -741,6 +741,60 @@ components:
             $ref: '#/components/schemas/AuthorSummary'
           description: Топ авторов за период
 
+    # Почасовая активность: одна ячейка матрицы weekday × hour
+    HourlyCell:
+      type: object
+      required:
+        - weekday
+        - hour
+        - commits
+      properties:
+        weekday:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 6
+          description: День недели по ISO — 0=Пн, 1=Вт … 6=Вс
+          example: 2
+        hour:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 23
+          description: Час суток (локальное время сервера сбора), 0..23
+          example: 14
+        commits:
+          type: integer
+          format: int64
+          description: Количество не-мердж коммитов в этой ячейке
+          example: 7
+        addedLines:
+          type: integer
+          format: int64
+          description: Сумма добавленных строк в этой ячейке (опционально)
+          example: 320
+
+    # Почасовая статистика: плотная (или разреженная) матрица день-недели × час
+    HourlyStats:
+      type: object
+      required:
+        - from
+        - to
+        - cells
+      properties:
+        from:
+          $ref: '#/components/schemas/Date'
+        to:
+          $ref: '#/components/schemas/Date'
+        cells:
+          type: array
+          description: |
+            Агрегаты по ключу (weekday, hour) за период. До 7×24 = 168 ячеек.
+            Бэк может опускать пустые ячейки (commits = 0) — фронт достраивает
+            полную сетку, отсутствующие ключи трактует как 0.
+          items:
+            $ref: '#/components/schemas/HourlyCell'
+
     # Ответ на синхронизацию пользователей Kaiten
     KaitenSyncResponse:
       type: object
