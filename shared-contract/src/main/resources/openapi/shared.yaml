@@ -795,6 +795,77 @@ components:
           items:
             $ref: '#/components/schemas/HourlyCell'
 
+    # Ревью-метрики одного автора за период
+    ReviewAuthor:
+      type: object
+      required:
+        - email
+        - reviewsGiven
+        - commentsGiven
+        - reviewsReceived
+        - avgTimeToMergeHours
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        displayName:
+          type: string
+          nullable: true
+          description: Отображаемое имя пользователя из Kaiten
+          example: "Boris"
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL аватара пользователя из Kaiten
+          example: "https://kaiten.x5.ru/avatars/42.png"
+        reviewsGiven:
+          type: integer
+          format: int32
+          description: |
+            Сколько чужих MR автор отревьюил (нажал Approve) за период, distinct по MR.
+            Свои MR не считаются.
+          example: 23
+        commentsGiven:
+          type: integer
+          format: int32
+          description: |
+            Сколько ревью-комментариев автор написал к чужим MR за период
+            (не-системные заметки; свои MR не считаются). Объём, не distinct по MR.
+          example: 47
+        reviewsReceived:
+          type: integer
+          format: int32
+          description: Сколько MR/PR этого автора были отревьюены другими
+          example: 14
+        avgTimeToMergeHours:
+          type: number
+          format: double
+          description: Среднее время от открытия MR/PR автора до merge, в часах
+          example: 18.5
+        mergedMrCount:
+          type: integer
+          format: int32
+          description: Сколько MR/PR автора были смержены за период (опционально)
+          example: 11
+
+    # Сводка ревью-метрик за период: баланс «пишу / ревьюю», время до merge
+    ReviewStats:
+      type: object
+      required:
+        - from
+        - to
+        - authors
+      properties:
+        from:
+          $ref: '#/components/schemas/Date'
+        to:
+          $ref: '#/components/schemas/Date'
+        authors:
+          type: array
+          description: Метрики ревью по авторам за период
+          items:
+            $ref: '#/components/schemas/ReviewAuthor'
+
     # Ответ на синхронизацию пользователей Kaiten
     KaitenSyncResponse:
       type: object
