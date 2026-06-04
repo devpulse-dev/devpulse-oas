@@ -200,3 +200,50 @@ paths:
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /stats/reviews:
+    get:
+      tags:
+        - Stats
+      summary: Получить ревью-метрики за период
+      description: |
+        Метрики code review по авторам за период: кто тащит ревью, баланс «пишу / ревьюю»,
+        среднее время до merge. Сильный сигнал здоровья команды — обычно невидимый.
+
+        Данные о ревью собираются из API Git-провайдера (GitLab MR / GitHub PR): approvals,
+        timestamps открытия/merge. Это отдельный источник от коммитов.
+      operationId: getReviewStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+      responses:
+        '200':
+          description: Ревью-метрики за период
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/ReviewStats'
+              example:
+                from: "2026-05-01"
+                to: "2026-05-31"
+                authors:
+                  - email: "boris@x5.ru"
+                    displayName: "Boris"
+                    avatarUrl: "https://kaiten.x5.ru/avatars/42.png"
+                    reviewsGiven: 23
+                    commentsGiven: 47
+                    reviewsReceived: 14
+                    avgTimeToMergeHours: 18.5
+                    mergedMrCount: 11
+                  - email: "alice@x5.ru"
+                    displayName: null
+                    avatarUrl: null
+                    reviewsGiven: 5
+                    commentsGiven: 31
+                    reviewsReceived: 19
+                    avgTimeToMergeHours: 42.0
+                    mergedMrCount: 17
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
