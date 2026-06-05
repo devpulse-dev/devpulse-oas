@@ -198,6 +198,16 @@ components:
           format: int64
           description: Количество добавленных строк в тестах
           example: 320
+        team:
+          type: string
+          nullable: true
+          description: Команда автора (из unified_user). null — команда не задана.
+          example: "Маркировка"
+        isLead:
+          type: boolean
+          default: false
+          description: Является ли автор лидом своей команды.
+          example: false
         activity:
           type: object
           nullable: true
@@ -861,6 +871,16 @@ components:
           format: int32
           description: Сколько MR/PR автора были смержены за период (опционально)
           example: 11
+        team:
+          type: string
+          nullable: true
+          description: Команда автора (из unified_user). null — команда не задана.
+          example: "Маркировка"
+        isLead:
+          type: boolean
+          default: false
+          description: Является ли автор лидом своей команды.
+          example: false
 
     # Сводка ревью-метрик за период: баланс «пишу / ревьюю», время до merge
     ReviewStats:
