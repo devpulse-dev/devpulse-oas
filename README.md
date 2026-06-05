@@ -36,18 +36,20 @@ devpulse-oas/
 
 | Модуль | Maven Artifact | Описание | Версия |
 |--------|----------------|----------|--------|
-| **shared-contract** | `com.devpulse:shared-contract` | Общие схемы (UUID, DateTime, Error), security схемы, типы данных | `1.0.0` |
-| **collection-contract** | `com.devpulse:collection-contract` | API для управления сбором данных из Git и Kaiten | `1.0.0` |
-| **dashboard-contract** | `com.devpulse:dashboard-contract` | API для дашборда с пагинацией авторов | `1.0.0` |
-| **stats-contract** | `com.devpulse:stats-contract` | API для получения статистики по разработчикам | `1.0.0` |
-| **users-contract** | `com.devpulse:users-contract` | API для работы с профилями пользователей и их коммитами | `1.0.0` |
-| **kaiten-contract** | `com.devpulse:kaiten-contract` | API для интеграции с Kaiten | `1.0.0` |
+| **shared-contract** | `com.devpulse:shared-contract` | Общие схемы (UUID, DateTime, Error, UserProfile, AuthorSummary, ReviewAuthor, Team…), security схемы | `1.7.0` |
+| **collection-contract** | `com.devpulse:collection-contract` | API для управления сбором данных из Git и Kaiten | `1.7.0` |
+| **dashboard-contract** | `com.devpulse:dashboard-contract` | API для дашборда с пагинацией авторов | `1.7.0` |
+| **stats-contract** | `com.devpulse:stats-contract` | Статистика (daily/weekly/summary/reviews) + досье к performance review | `1.7.0` |
+| **users-contract** | `com.devpulse:users-contract` | Профили, коммиты, список пользователей, команды и лиды | `1.7.0` |
+| **kaiten-contract** | `com.devpulse:kaiten-contract` | API для интеграции с Kaiten | `1.7.0` |
+
+> Версии — lockstep: все модули публикуются одной версией (единый `<revision>` в корневом `pom.xml`).
 
 ### npm-пакет (frontend)
 
 | Пакет | Содержимое | Версия |
 |-------|------------|--------|
-| **`@devpulse-dev/api-types`** | TypeScript-типы (`components`/`paths`/`operations`) + bundled `openapi.json` на весь API | `1.0.0` |
+| **`@devpulse-dev/api-types`** | TypeScript-типы (`components`/`paths`/`operations`) + bundled `openapi.json` на весь API | `1.7.0` |
 
 ## 🚀 Быстрый старт
 
@@ -75,32 +77,32 @@ cd devpulse-oas
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>collection-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>dashboard-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>stats-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>users-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>kaiten-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>shared-contract</artifactId>
-        <version>1.0.0</version>
+        <version>1.7.0</version>
     </dependency>
 </dependencies>
 ```
@@ -193,13 +195,29 @@ Semver: additive = minor, breaking = major, доки = patch. Релиз:
 - `GET /api/v2/stats/daily` — получить дневную статистику
 - `GET /api/v2/stats/weekly` — получить недельную статистику (ISO-недели)
 - `GET /api/v2/stats/summary` — получить сводку за период
+- `GET /api/v2/stats/reviews` — ревью-метрики (given/received, time-to-merge) из GitLab
+- `GET /api/v2/performance/review` — досье к performance review по одному человеку
+  - Параметры: `email`, `from`, `to`, `compareToPrevious` (дельты к предыдущему периоду)
+  - Возвращает `PerformanceReview`: метрики код/ревью/задачи с дельтами, разбивка дефект/разработка, highlights
 
 ### Users API
 
-Профили и коммиты пользователей:
+Профили, коммиты и команды:
 
+- `GET /api/v2/users` — список пользователей (опц. `?team=` — фильтр по команде)
 - `GET /api/v2/users/{email}/profile` — получить профиль пользователя (опциональные `from`, `to`)
 - `GET /api/v2/users/{email}/commits` — получить коммиты пользователя с пагинацией
+- `PUT /api/v2/users/{email}/team` — назначить/снять команду (`{ team: string|null }`)
+
+### Teams API
+
+Команды и их лиды (тег `Teams` в `users-contract`):
+
+- `GET /api/v2/teams` — список команд `{ name, lead, members }`
+- `PUT /api/v2/teams/lead` — назначить/снять лида (`{ team, email: string|null }`)
+
+> `team` и `isLead` присутствуют во всех DTO с информацией о разработчике
+> (`UserProfile`, `AuthorSummary`, `ReviewAuthor`).
 
 ### Kaiten API
 
