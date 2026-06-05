@@ -362,6 +362,7 @@ components:
         period:
           $ref: 'shared.yaml#/components/schemas/Period'
         comparedTo:
+          type: object
           allOf:
             - $ref: 'shared.yaml#/components/schemas/Period'
           nullable: true

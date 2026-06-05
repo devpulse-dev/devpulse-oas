@@ -355,6 +355,7 @@ components:
           description: Имя команды.
           example: "Маркировка"
         lead:
+          type: object
           allOf:
             - $ref: 'shared.yaml#/components/schemas/UserProfile'
           nullable: true
