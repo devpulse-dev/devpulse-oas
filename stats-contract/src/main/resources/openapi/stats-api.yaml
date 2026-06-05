@@ -247,3 +247,264 @@ paths:
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /performance/review:
+    get:
+      tags:
+        - Stats
+      summary: Досье к Performance Review
+      description: |
+        Агрегированное «досье» по одному человеку за период для подготовки к perf-review:
+        код (коммиты/строки/тест-строки), ревью (given/received), задачи Kaiten по типам
+        (дефекты / разработка). Каждая метрика — с дельтой к предыдущему равному периоду
+        (если compareToPrevious=true).
+
+        Это read-model поверх уже собранных данных — отдельного сбора не запускает.
+
+        ВАЖНО (снапшот «как сейчас»): счётчики дефектов/задач считаются по ТЕКУЩЕМУ
+        состоянию карточек Kaiten (live), отфильтрованных по пересечению с периодом.
+        Для отчёта за давно прошедший период состояние карточек может уже измениться —
+        фронту стоит это подписать. См. future.md (Фаза 3 снимает ограничение).
+
+        testAddedLines — это СТРОКИ тест-кода, не количество тестов.
+      operationId: getPerformanceReview
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email человека, по которому собирается досье
+          example: "boris@x5.ru"
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: compareToPrevious
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: |
+            Считать дельты к предыдущему периоду равной длины, встык перед from.
+            false — поля previous/delta/deltaPct у метрик будут null, comparedTo = null.
+          example: true
+      responses:
+        '200':
+          description: Досье к perf-review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+              example:
+                subject:
+                  id: 42
+                  email: "boris@x5.ru"
+                  username: "boris"
+                  name: "Boris"
+                  avatarUrl: null
+                  kaitenId: 7
+                  gitlabId: null
+                  team: "Platform"
+                period:
+                  from: "2026-01-01"
+                  to: "2026-03-31"
+                comparedTo:
+                  from: "2025-10-03"
+                  to: "2025-12-31"
+                metrics:
+                  commits: { current: 312, previous: 280, delta: 32, deltaPct: 11.4 }
+                  nonMergeCommits: { current: 294, previous: 265, delta: 29, deltaPct: 10.9 }
+                  addedLines: { current: 12400, previous: 11800, delta: 600, deltaPct: 5.1 }
+                  deletedLines: { current: 5800, previous: 5200, delta: 600, deltaPct: 11.5 }
+                  testAddedLines: { current: 2120, previous: 1500, delta: 620, deltaPct: 41.3 }
+                  reviewsGiven: { current: 64, previous: 50, delta: 14, deltaPct: 28.0 }
+                  commentsGiven: { current: 180, previous: 150, delta: 30, deltaPct: 20.0 }
+                  reviewsReceived: { current: 40, previous: 38, delta: 2, deltaPct: 5.3 }
+                  avgTimeToMergeHours: { current: 18.5, previous: 22.0, delta: -3.5, deltaPct: -15.9 }
+                  mergedMrCount: { current: 28, previous: 25, delta: 3, deltaPct: 12.0 }
+                  defectsInWork: { current: 4, previous: null, delta: null, deltaPct: null }
+                  defectsClosed: { current: 11, previous: 9, delta: 2, deltaPct: 22.2 }
+                  devTasksInWork: { current: 6, previous: null, delta: null, deltaPct: null }
+                  devTasksClosed: { current: 19, previous: 17, delta: 2, deltaPct: 11.8 }
+                taskBreakdown:
+                  defect: { inProgress: 4, done: 11, total: 15 }
+                  development: { inProgress: 6, done: 19, total: 25 }
+                highlights:
+                  - kind: "CARD"
+                    title: "Critical: расчёт скидок ломается на null-цене"
+                    subtitle: "DEFECT · DONE"
+                    url: "https://kaiten.x5.ru/2963977"
+                  - kind: "MR"
+                    title: "feat: новый расчётный движок"
+                    subtitle: "merged · 12h to merge"
+                    url: "https://scm.x5.ru/xrg-core/-/merge_requests/812"
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+components:
+  schemas:
+    PerformanceReview:
+      type: object
+      description: Досье к perf-review по одному человеку за период.
+      required:
+        - subject
+        - period
+        - metrics
+        - taskBreakdown
+        - highlights
+      properties:
+        subject:
+          $ref: 'shared.yaml#/components/schemas/UserProfile'
+        period:
+          $ref: 'shared.yaml#/components/schemas/Period'
+        comparedTo:
+          allOf:
+            - $ref: 'shared.yaml#/components/schemas/Period'
+          nullable: true
+          description: Предыдущий период сравнения. null, если compareToPrevious=false.
+        metrics:
+          $ref: '#/components/schemas/PerformanceMetrics'
+        taskBreakdown:
+          $ref: '#/components/schemas/TaskTypeBreakdown'
+        highlights:
+          type: array
+          description: Заметные карточки/MR со ссылками — пруфы к разговору.
+          items:
+            $ref: '#/components/schemas/PerformanceHighlight'
+
+    MetricDelta:
+      type: object
+      description: |
+        Значение метрики с дельтой к предыдущему периоду. previous/delta/deltaPct = null,
+        если сравнение не запрашивалось ИЛИ метрика неисторична (снапшот «как сейчас»,
+        например *InWork). deltaPct = (current − previous) / previous × 100; null при previous = 0.
+      required:
+        - current
+      properties:
+        current:
+          type: number
+          format: double
+          description: Значение за текущий период.
+          example: 312
+        previous:
+          type: number
+          format: double
+          nullable: true
+          description: Значение за предыдущий период.
+          example: 280
+        delta:
+          type: number
+          format: double
+          nullable: true
+          description: current − previous.
+          example: 32
+        deltaPct:
+          type: number
+          format: double
+          nullable: true
+          description: Изменение в процентах.
+          example: 11.4
+
+    PerformanceMetrics:
+      type: object
+      description: |
+        Набор метрик досье. Счётчики целочисленны по смыслу, но обёрнуты в MetricDelta
+        (number/double) ради единообразия виджета дельты на фронте. *InWork — снапшот
+        «как сейчас», у них previous/delta всегда null.
+      required:
+        - commits
+        - nonMergeCommits
+        - addedLines
+        - deletedLines
+        - testAddedLines
+        - reviewsGiven
+        - commentsGiven
+        - reviewsReceived
+        - avgTimeToMergeHours
+        - mergedMrCount
+        - defectsInWork
+        - defectsClosed
+        - devTasksInWork
+        - devTasksClosed
+      properties:
+        commits: { $ref: '#/components/schemas/MetricDelta' }
+        nonMergeCommits: { $ref: '#/components/schemas/MetricDelta' }
+        addedLines: { $ref: '#/components/schemas/MetricDelta' }
+        deletedLines: { $ref: '#/components/schemas/MetricDelta' }
+        testAddedLines: { $ref: '#/components/schemas/MetricDelta' }
+        reviewsGiven: { $ref: '#/components/schemas/MetricDelta' }
+        commentsGiven: { $ref: '#/components/schemas/MetricDelta' }
+        reviewsReceived: { $ref: '#/components/schemas/MetricDelta' }
+        avgTimeToMergeHours: { $ref: '#/components/schemas/MetricDelta' }
+        mergedMrCount: { $ref: '#/components/schemas/MetricDelta' }
+        defectsInWork: { $ref: '#/components/schemas/MetricDelta' }
+        defectsClosed: { $ref: '#/components/schemas/MetricDelta' }
+        devTasksInWork: { $ref: '#/components/schemas/MetricDelta' }
+        devTasksClosed: { $ref: '#/components/schemas/MetricDelta' }
+
+    TaskTypeBreakdown:
+      type: object
+      description: Разбивка карточек Kaiten по типу и статусу (для стэкбаров).
+      required:
+        - defect
+        - development
+      properties:
+        defect:
+          $ref: '#/components/schemas/TaskStatusCounts'
+        development:
+          $ref: '#/components/schemas/TaskStatusCounts'
+
+    TaskStatusCounts:
+      type: object
+      required:
+        - inProgress
+        - done
+        - total
+      properties:
+        inProgress:
+          type: integer
+          format: int32
+          description: Карточки в работе (columnStatus == IN_PROGRESS на момент запроса).
+          example: 4
+        done:
+          type: integer
+          format: int32
+          description: Карточки, закрытые в периоде (closedAt в [from, to]).
+          example: 11
+        total:
+          type: integer
+          format: int32
+          description: Всего карточек этого типа, пересекающихся с периодом.
+          example: 15
+
+    PerformanceHighlight:
+      type: object
+      description: Заметный артефакт (карточка/MR) со ссылкой — пруф к разговору.
+      required:
+        - kind
+        - title
+        - url
+      properties:
+        kind:
+          type: string
+          enum: [CARD, MR]
+          description: Тип артефакта — карточка Kaiten или merge request.
+          example: "CARD"
+        title:
+          type: string
+          description: Заголовок.
+          example: "Critical: расчёт скидок ломается на null-цене"
+        subtitle:
+          type: string
+          nullable: true
+          description: Доп. контекст (тип/статус карточки, время до merge и т.п.).
+          example: "DEFECT · DONE"
+        url:
+          type: string
+          format: uri
+          description: Ссылка в Kaiten / GitLab.
+          example: "https://kaiten.x5.ru/2963977"

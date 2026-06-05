@@ -151,8 +151,106 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Список пользователей
+      description: |
+        Все записи unified_user. Используется для picker'а в разделе Performance Review
+        и для управления командами. Опциональный фильтр ?team= — вернуть только людей
+        указанной команды (team= без значения или с пустой строкой не фильтрует).
+      operationId: listUsers
+      parameters:
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по команде. Без параметра — все пользователи.
+          example: "Platform"
+      responses:
+        '200':
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: 'shared.yaml#/components/schemas/UserProfile'
+              example:
+                - id: 42
+                  email: "boris@x5.ru"
+                  username: "boris"
+                  name: "Boris"
+                  avatarUrl: null
+                  kaitenId: 7
+                  gitlabId: null
+                  team: "Platform"
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /users/{email}/team:
+    put:
+      tags:
+        - Users
+      summary: Назначить/снять команду пользователя
+      description: |
+        Управление командами с фронта. team в теле — имя команды; null снимает привязку.
+      operationId: setUserTeam
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTeamRequest'
+            example:
+              team: "Platform"
+      responses:
+        '200':
+          description: Обновлённый профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/UserProfile'
+              example:
+                id: 42
+                email: "boris@x5.ru"
+                username: "boris"
+                name: "Boris"
+                avatarUrl: null
+                kaitenId: 7
+                gitlabId: null
+                team: "Platform"
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
 components:
   schemas:
+    SetTeamRequest:
+      type: object
+      required:
+        - team
+      properties:
+        team:
+          type: string
+          nullable: true
+          description: Имя команды. null — снять привязку.
+          example: "Platform"
+
     UserProfileResponse:
       type: object
       required:

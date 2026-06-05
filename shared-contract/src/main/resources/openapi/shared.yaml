@@ -352,6 +352,13 @@ components:
           nullable: true
           description: ID пользователя в GitLab
           example: null
+        team:
+          type: string
+          nullable: true
+          description: |
+            Команда пользователя. Назначается через фронт (PUT /users/{email}/team).
+            null, если команда не задана. Свободный текст (без справочника команд в v1).
+          example: "Platform"
 
     # Коммит
     Commit:
