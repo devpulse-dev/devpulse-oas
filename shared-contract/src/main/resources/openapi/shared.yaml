@@ -359,6 +359,13 @@ components:
             Команда пользователя. Назначается через фронт (PUT /users/{email}/team).
             null, если команда не задана. Свободный текст (без справочника команд в v1).
           example: "Platform"
+        isLead:
+          type: boolean
+          default: false
+          description: |
+            Является ли пользователь лидом своей команды. Один лид на команду
+            (назначается через PUT /teams/lead). Без команды всегда false.
+          example: false
 
     # Коммит
     Commit:

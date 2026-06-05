@@ -13,6 +13,8 @@ servers:
 tags:
   - name: Users
     description: Профили и коммиты пользователей
+  - name: Teams
+    description: Команды и их лиды
 
 # Auth handled outside the contract (gateway / SSO). API exposes no
 # operation-level security requirements.
@@ -238,6 +240,81 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /teams:
+    get:
+      tags:
+        - Teams
+      summary: Список команд
+      description: |
+        Команды, выведенные из unified_user.team: имя, лид (если назначен) и участники.
+        Используется для глобального фильтра по командам и отображения «кто откуда».
+        Пользователи без команды (team = null) не попадают ни в одну команду.
+      operationId: listTeams
+      responses:
+        '200':
+          description: Список команд
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Team'
+              example:
+                - name: "Маркировка"
+                  lead:
+                    id: 35
+                    email: "boris.osechinskiy@x5.ru"
+                    name: "Boris Osechinsky"
+                    team: "Маркировка"
+                    isLead: true
+                  members:
+                    - id: 35
+                      email: "boris.osechinskiy@x5.ru"
+                      name: "Boris Osechinsky"
+                      team: "Маркировка"
+                      isLead: true
+                    - id: 24
+                      email: "tatiana.matvienko@x5.ru"
+                      name: "Tatyana Matvienko"
+                      team: "Маркировка"
+                      isLead: false
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /teams/lead:
+    put:
+      tags:
+        - Teams
+      summary: Назначить/снять лида команды
+      description: |
+        Один лид на команду. email в теле — новый лид (он же добавляется в команду,
+        если ещё не в ней; прежний лид этой команды теряет признак). email = null —
+        снять лида с команды. 404 — если указанного пользователя нет, либо при снятии
+        лида команда не существует (нет участников).
+      operationId: setTeamLead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTeamLeadRequest'
+            example:
+              team: "Маркировка"
+              email: "boris.osechinskiy@x5.ru"
+      responses:
+        '200':
+          description: Обновлённая команда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
 components:
   schemas:
     SetTeamRequest:
@@ -250,6 +327,43 @@ components:
           nullable: true
           description: Имя команды. null — снять привязку.
           example: "Platform"
+
+    SetTeamLeadRequest:
+      type: object
+      required:
+        - team
+      properties:
+        team:
+          type: string
+          description: Имя команды.
+          example: "Маркировка"
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Email нового лида; null — снять лида с команды.
+          example: "boris.osechinskiy@x5.ru"
+
+    Team:
+      type: object
+      required:
+        - name
+        - members
+      properties:
+        name:
+          type: string
+          description: Имя команды.
+          example: "Маркировка"
+        lead:
+          allOf:
+            - $ref: 'shared.yaml#/components/schemas/UserProfile'
+          nullable: true
+          description: Лид команды; null, если не назначен.
+        members:
+          type: array
+          description: Участники команды (включая лида).
+          items:
+            $ref: 'shared.yaml#/components/schemas/UserProfile'
 
     UserProfileResponse:
       type: object
