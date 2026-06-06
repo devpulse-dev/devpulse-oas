@@ -475,11 +475,12 @@ components:
           example: 70
         cardType:
           type: string
-          enum: [DEVELOPMENT, DEFECT, OTHER]
+          enum: [DEVELOPMENT, DEFECT, TASK, OTHER]
           description: |
             Наша классификация типа карточки, derived из typeId:
               - DEVELOPMENT — typeId == 70
               - DEFECT — typeId == 8
+              - TASK — typeId == 6
               - OTHER — всё остальное
           example: "DEVELOPMENT"
         columnType:
