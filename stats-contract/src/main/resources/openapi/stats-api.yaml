@@ -356,7 +356,7 @@ components:
         - metrics
         - taskBreakdown
         - kaiten
-        - highlights
+        - notable
       properties:
         subject:
           $ref: 'shared.yaml#/components/schemas/UserProfile'
@@ -374,11 +374,8 @@ components:
           $ref: '#/components/schemas/TaskTypeBreakdown'
         kaiten:
           $ref: '#/components/schemas/KaitenInsights'
-        highlights:
-          type: array
-          description: Заметные карточки/MR со ссылками — пруфы к разговору.
-          items:
-            $ref: '#/components/schemas/PerformanceHighlight'
+        notable:
+          $ref: '#/components/schemas/NotableResults'
 
     MetricDelta:
       type: object
@@ -485,33 +482,84 @@ components:
           description: Всего карточек этого типа, пересекающихся с периодом.
           example: 15
 
-    PerformanceHighlight:
+    NotableResults:
       type: object
-      description: Заметный артефакт (карточка/MR) со ссылкой — пруф к разговору.
+      description: |
+        Заметные результаты за период — два осмысленных среза. Строятся на надёжных сигналах
+        (срочность дефекта, завершённость, уровень фичи); member.type/«ответственный» и time_spent
+        НЕ используются (первый = владелец карточки, не исполнитель; второй заполняется руками).
       required:
-        - kind
-        - title
-        - url
+        - firefighting
+        - deliveredFeatures
       properties:
-        kind:
-          type: string
-          enum: [CARD, MR]
-          description: Тип артефакта — карточка Kaiten или merge request.
-          example: "CARD"
+        firefighting:
+          type: array
+          description: «🔥 Тушение пожаров» — закрытые в периоде критичные/высокие дефекты.
+          items:
+            $ref: '#/components/schemas/FirefightingItem'
+        deliveredFeatures:
+          type: array
+          description: «🚀 Доставленные доработки» — корневые задачи с завершёнными юскейсами.
+          items:
+            $ref: '#/components/schemas/DeliveredFeature'
+
+    FirefightingItem:
+      type: object
+      description: Закрытый критичный/высокий дефект.
+      required:
+        - id
+        - title
+        - urgency
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 2963977
         title:
           type: string
-          description: Заголовок.
           example: "Critical: расчёт скидок ломается на null-цене"
-        subtitle:
-          type: string
-          nullable: true
-          description: Доп. контекст (тип/статус карточки, время до merge и т.п.).
-          example: "DEFECT · DONE"
         url:
           type: string
           format: uri
-          description: Ссылка в Kaiten / GitLab.
+          nullable: true
           example: "https://kaiten.x5.ru/2963977"
+        urgency:
+          type: string
+          enum: [CRITICAL, HIGH, MEDIUM, LOW, UNKNOWN]
+          description: На практике только CRITICAL/HIGH.
+          example: "CRITICAL"
+
+    DeliveredFeature:
+      type: object
+      description: Доставленная доработка — корневая задача с завершёнными юскейсами.
+      required:
+        - id
+        - title
+        - doneCount
+        - totalCount
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 3263902
+        title:
+          type: string
+          example: "[ТС5] [ЦМП] GK. Разработка. 1960136. Пиво."
+        url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://kaiten.x5.ru/3263902"
+        doneCount:
+          type: integer
+          format: int32
+          description: Сколько юскейсов закрыто (DONE).
+          example: 5
+        totalCount:
+          type: integer
+          format: int32
+          description: Всего юскейсов под корневой задачей.
+          example: 6
 
     KaitenInsights:
       type: object
