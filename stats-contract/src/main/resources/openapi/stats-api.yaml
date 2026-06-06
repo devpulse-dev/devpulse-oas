@@ -529,7 +529,7 @@ components:
         development:
           $ref: '#/components/schemas/DevelopmentRollup'
         cycleTime:
-          $ref: '#/components/schemas/CycleTime'
+          $ref: '#/components/schemas/CycleTimeBreakdown'
         balance:
           $ref: '#/components/schemas/WorkBalance'
 
@@ -677,6 +677,20 @@ components:
           enum: [DEVELOPMENT, TASK, DEFECT, OTHER]
           description: Тип карточки-юскейса (на практике DEVELOPMENT или TASK).
           example: "DEVELOPMENT"
+
+    CycleTimeBreakdown:
+      type: object
+      description: |
+        Cycle-time раздельно по дефектам и разработке — длительность у них разная
+        (разработка обычно дольше), общая медиана была бы некорректной.
+      required:
+        - defects
+        - development
+      properties:
+        defects:
+          $ref: '#/components/schemas/CycleTime'
+        development:
+          $ref: '#/components/schemas/CycleTime'
 
     CycleTime:
       type: object
