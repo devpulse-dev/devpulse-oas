@@ -355,6 +355,7 @@ components:
         - period
         - metrics
         - taskBreakdown
+        - kaiten
         - highlights
       properties:
         subject:
@@ -371,6 +372,8 @@ components:
           $ref: '#/components/schemas/PerformanceMetrics'
         taskBreakdown:
           $ref: '#/components/schemas/TaskTypeBreakdown'
+        kaiten:
+          $ref: '#/components/schemas/KaitenInsights'
         highlights:
           type: array
           description: Заметные карточки/MR со ссылками — пруфы к разговору.
@@ -509,3 +512,231 @@ components:
           format: uri
           description: Ссылка в Kaiten / GitLab.
           example: "https://kaiten.x5.ru/2963977"
+
+    KaitenInsights:
+      type: object
+      description: |
+        Развёрнутая аналитика по карточкам Kaiten за период (снапшот «как сейчас»):
+        дефекты по срочности, разработка по корневым задачам, cycle-time, баланс работы.
+      required:
+        - defects
+        - development
+        - cycleTime
+        - balance
+      properties:
+        defects:
+          $ref: '#/components/schemas/DefectsSummary'
+        development:
+          $ref: '#/components/schemas/DevelopmentRollup'
+        cycleTime:
+          $ref: '#/components/schemas/CycleTimeBreakdown'
+        balance:
+          $ref: '#/components/schemas/WorkBalance'
+
+    DefectsSummary:
+      type: object
+      description: Дефекты субъекта за период с разбивкой по срочности.
+      required:
+        - total
+        - inWork
+        - closed
+        - criticalHigh
+        - byUrgency
+      properties:
+        total:
+          type: integer
+          format: int32
+          example: 15
+        inWork:
+          type: integer
+          format: int32
+          description: Открытые в работе (columnStatus == IN_PROGRESS).
+          example: 4
+        closed:
+          type: integer
+          format: int32
+          description: Закрытые в периоде.
+          example: 11
+        criticalHigh:
+          type: integer
+          format: int32
+          description: KPI «горящие» — критичные + высокие.
+          example: 6
+        byUrgency:
+          $ref: '#/components/schemas/UrgencyCounts'
+
+    UrgencyCounts:
+      type: object
+      description: Счётчики дефектов по срочности (из property id_2561).
+      required:
+        - critical
+        - high
+        - medium
+        - low
+        - unknown
+      properties:
+        critical:
+          type: integer
+          format: int32
+          example: 4
+        high:
+          type: integer
+          format: int32
+          example: 2
+        medium:
+          type: integer
+          format: int32
+          example: 5
+        low:
+          type: integer
+          format: int32
+          example: 4
+        unknown:
+          type: integer
+          format: int32
+          description: Срочность не задана/неизвестный код.
+          example: 0
+
+    DevelopmentRollup:
+      type: object
+      description: Разработка (тип «разработка» + «задача»), агрегированная по корневой задаче.
+      required:
+        - useCaseCount
+        - rootTaskCount
+        - roots
+      properties:
+        useCaseCount:
+          type: integer
+          format: int32
+          description: Всего карточек-юскейсов.
+          example: 12
+        rootTaskCount:
+          type: integer
+          format: int32
+          description: Число уникальных реальных корневых задач (без синтетического ведра).
+          example: 4
+        roots:
+          type: array
+          description: Корневые задачи с юскейсами; синтетическое «Без корневой задачи» — последним.
+          items:
+            $ref: '#/components/schemas/RootTask'
+
+    RootTask:
+      type: object
+      description: Корневая задача с её юскейсами (узел аккордеона).
+      required:
+        - title
+        - useCases
+      properties:
+        id:
+          type: integer
+          format: int64
+          nullable: true
+          description: id карточки Kaiten; null — синтетическое ведро «Без корневой задачи».
+          example: 3263902
+        title:
+          type: string
+          example: "[ТС5] [ЦМП] GK. Разработка. 1960136. Пиво. Отключение потока"
+        url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://kaiten.x5.ru/3263902"
+        useCases:
+          type: array
+          items:
+            $ref: '#/components/schemas/UseCaseRef'
+
+    UseCaseRef:
+      type: object
+      description: Карточка-юскейс внутри корневой задачи.
+      required:
+        - id
+        - title
+        - status
+        - type
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 3263984
+        title:
+          type: string
+          example: "[РТ] UC4.[ТС5] [ЦМП] GK. Разработка. 1960136. Пиво."
+        url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://kaiten.x5.ru/3263984"
+        status:
+          type: string
+          enum: [NEW, IN_PROGRESS, DONE, UNKNOWN]
+          example: "DONE"
+        type:
+          type: string
+          enum: [DEVELOPMENT, TASK, DEFECT, OTHER]
+          description: Тип карточки-юскейса (на практике DEVELOPMENT или TASK).
+          example: "DEVELOPMENT"
+
+    CycleTimeBreakdown:
+      type: object
+      description: |
+        Cycle-time раздельно по дефектам и разработке — длительность у них разная
+        (разработка обычно дольше), общая медиана была бы некорректной.
+      required:
+        - defects
+        - development
+      properties:
+        defects:
+          $ref: '#/components/schemas/CycleTime'
+        development:
+          $ref: '#/components/schemas/CycleTime'
+
+    CycleTime:
+      type: object
+      description: |
+        Cycle-time по карточкам, закрытым в периоде: от первого перехода «в работу»
+        до перехода «готово». medianDays/meanDays = null, если данных нет (count == 0).
+      required:
+        - count
+      properties:
+        medianDays:
+          type: number
+          format: double
+          nullable: true
+          example: 3.0
+        meanDays:
+          type: number
+          format: double
+          nullable: true
+          example: 8.2
+        count:
+          type: integer
+          format: int32
+          example: 12
+
+    WorkBalance:
+      type: object
+      description: Баланс работы — дефекты (firefighting) vs разработка+задачи (building). Доли в [0..1].
+      required:
+        - defectCount
+        - buildCount
+        - defectShare
+        - buildShare
+      properties:
+        defectCount:
+          type: integer
+          format: int32
+          example: 95
+        buildCount:
+          type: integer
+          format: int32
+          example: 5
+        defectShare:
+          type: number
+          format: double
+          example: 0.95
+        buildShare:
+          type: number
+          format: double
+          example: 0.05
