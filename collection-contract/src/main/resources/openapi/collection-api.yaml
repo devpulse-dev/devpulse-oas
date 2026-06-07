@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DevPulse - Collection API
-  version: 1.2.0
+  version: 2.0.0
   description: API для управления сбором данных из Git и Kaiten
 
 servers:
@@ -23,15 +23,19 @@ paths:
     post:
       tags:
         - Collection
-      summary: Запустить сбор данных
+      summary: Запустить сбор данных (асинхронно)
       description: |
         Запускает полный цикл сбора: git → daily stats → (изолированно) sync Kaiten users
-        (обновление kaitenId/avatarUrl в unified_user). Карточки Kaiten НЕ выкачиваются —
-        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат
-        (SUCCESS или FAILED).
+        (обновление kaitenId/avatarUrl в unified_user) → ревью-метрики из GitLab. Карточки
+        Kaiten НЕ выкачиваются — они тянутся live при открытии профиля.
 
-        Один сбор за раз: распределённый mutex через PostgreSQL pg_try_advisory_lock.
-        Если в момент запроса уже идёт другой прогон — сразу возвращается 409, без ожидания.
+        **Асинхронный (BREAKING vs 2.x):** сразу возвращает 202 + прогон в статусе RUNNING
+        (с id), сам сбор идёт в фоне. Финальный статус наблюдать через
+        GET /collection/runs/{id} или /collection/runs/latest (RUNNING → SUCCESS/FAILED).
+        Прогон можно отменить: POST /collection/runs/{id}/cancel.
+
+        Один сбор за раз: распределённый mutex через PostgreSQL pg_try_advisory_lock берётся
+        синхронно до ответа. Если в момент запроса уже идёт другой прогон — сразу 409, без ожидания.
       operationId: startCollectionRun
       requestBody:
         description: Опциональные параметры запуска сбора
@@ -43,8 +47,8 @@ paths:
               since: "2026-05-10T00:00:00"
         required: false
       responses:
-        '200':
-          description: Прогон сбора запущен и завершён
+        '202':
+          description: Прогон сбора запущен (идёт в фоне). Опрашивайте статус через GET.
           content:
             application/json:
               schema:
@@ -52,10 +56,10 @@ paths:
               example:
                 id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
                 startedAt: "2026-05-23T14:00:00"
-                finishedAt: "2026-05-23T14:00:42"
+                finishedAt: null
                 sinceDate: "2026-05-10T00:00:00"
                 untilDate: "2026-05-23T14:00:00"
-                status: "SUCCESS"
+                status: "RUNNING"
                 errorMessage: null
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
