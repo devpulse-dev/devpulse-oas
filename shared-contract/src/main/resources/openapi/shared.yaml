@@ -294,12 +294,15 @@ components:
           $ref: '#/components/schemas/DateTime'
         status:
           type: string
-          enum: [RUNNING, SUCCESS, FAILED]
-          description: Статус прогона сбора
+          enum: [RUNNING, SUCCESS, FAILED, CANCELLED]
+          description: |
+            Статус прогона сбора. CANCELLED — отменён оператором через
+            POST /collection/runs/{id}/cancel (семантика консистентности как у FAILED:
+            курсор не двигается, следующий сбор доберёт недостающее).
         errorMessage:
           type: string
           nullable: true
-          description: Сообщение об ошибке (если status = FAILED)
+          description: Сообщение об ошибке (status = FAILED) или причина отмены (status = CANCELLED)
 
     # Запрос на запуск сбора
     CollectionRunRequest:
