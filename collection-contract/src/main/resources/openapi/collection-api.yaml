@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DevPulse - Collection API
-  version: 1.1.0
+  version: 1.2.0
   description: API для управления сбором данных из Git и Kaiten
 
 servers:
@@ -74,6 +74,41 @@ paths:
                 status: 409
                 detail: "Another collection run is in progress. Wait for it to finish or query its status via GET /api/v2/collection/runs/{id}."
                 instance: "/api/v2/collection/runs"
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /collection/runs/latest:
+    get:
+      tags:
+        - Collection
+      summary: Последний (или идущий) прогон сбора
+      description: |
+        Возвращает самый свежий прогон по startedAt. Источник правды для фронта:
+        - status=RUNNING → сбор идёт прямо сейчас; используйте этот id для опроса
+          GET /collection/runs/{id} и для отмены POST /collection/runs/{id}/cancel;
+        - терминальный статус (SUCCESS/FAILED/CANCELLED) → последний результат, можно
+          запускать новый сбор.
+
+        Поскольку сбор single-flight (advisory lock), идущий прогон всегда и есть самый
+        свежий. 404 — если ни одного прогона ещё не было.
+      operationId: getLatestCollectionRun
+      responses:
+        '200':
+          description: Последний / идущий прогон сбора
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/CollectionRun'
+              example:
+                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                startedAt: "2026-05-23T14:00:00"
+                finishedAt: null
+                sinceDate: "2026-05-10T00:00:00"
+                untilDate: "2026-05-23T14:00:00"
+                status: "RUNNING"
+                errorMessage: null
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
