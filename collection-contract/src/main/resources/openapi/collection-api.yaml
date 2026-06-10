@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DevPulse - Collection API
-  version: 1.0.0
+  version: 2.0.0
   description: API для управления сбором данных из Git и Kaiten
 
 servers:
@@ -23,15 +23,19 @@ paths:
     post:
       tags:
         - Collection
-      summary: Запустить сбор данных
+      summary: Запустить сбор данных (асинхронно)
       description: |
         Запускает полный цикл сбора: git → daily stats → (изолированно) sync Kaiten users
-        (обновление kaitenId/avatarUrl в unified_user). Карточки Kaiten НЕ выкачиваются —
-        они тянутся live при открытии профиля. Синхронный — отдаёт уже финальный результат
-        (SUCCESS или FAILED).
+        (обновление kaitenId/avatarUrl в unified_user) → ревью-метрики из GitLab. Карточки
+        Kaiten НЕ выкачиваются — они тянутся live при открытии профиля.
 
-        Один сбор за раз: распределённый mutex через PostgreSQL pg_try_advisory_lock.
-        Если в момент запроса уже идёт другой прогон — сразу возвращается 409, без ожидания.
+        **Асинхронный (BREAKING vs 2.x):** сразу возвращает 202 + прогон в статусе RUNNING
+        (с id), сам сбор идёт в фоне. Финальный статус наблюдать через
+        GET /collection/runs/{id} или /collection/runs/latest (RUNNING → SUCCESS/FAILED).
+        Прогон можно отменить: POST /collection/runs/{id}/cancel.
+
+        Один сбор за раз: распределённый mutex через PostgreSQL pg_try_advisory_lock берётся
+        синхронно до ответа. Если в момент запроса уже идёт другой прогон — сразу 409, без ожидания.
       operationId: startCollectionRun
       requestBody:
         description: Опциональные параметры запуска сбора
@@ -43,8 +47,8 @@ paths:
               since: "2026-05-10T00:00:00"
         required: false
       responses:
-        '200':
-          description: Прогон сбора запущен и завершён
+        '202':
+          description: Прогон сбора запущен (идёт в фоне). Опрашивайте статус через GET.
           content:
             application/json:
               schema:
@@ -52,10 +56,10 @@ paths:
               example:
                 id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
                 startedAt: "2026-05-23T14:00:00"
-                finishedAt: "2026-05-23T14:00:42"
+                finishedAt: null
                 sinceDate: "2026-05-10T00:00:00"
                 untilDate: "2026-05-23T14:00:00"
-                status: "SUCCESS"
+                status: "RUNNING"
                 errorMessage: null
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
@@ -74,6 +78,41 @@ paths:
                 status: 409
                 detail: "Another collection run is in progress. Wait for it to finish or query its status via GET /api/v2/collection/runs/{id}."
                 instance: "/api/v2/collection/runs"
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /collection/runs/latest:
+    get:
+      tags:
+        - Collection
+      summary: Последний (или идущий) прогон сбора
+      description: |
+        Возвращает самый свежий прогон по startedAt. Источник правды для фронта:
+        - status=RUNNING → сбор идёт прямо сейчас; используйте этот id для опроса
+          GET /collection/runs/{id} и для отмены POST /collection/runs/{id}/cancel;
+        - терминальный статус (SUCCESS/FAILED/CANCELLED) → последний результат, можно
+          запускать новый сбор.
+
+        Поскольку сбор single-flight (advisory lock), идущий прогон всегда и есть самый
+        свежий. 404 — если ни одного прогона ещё не было.
+      operationId: getLatestCollectionRun
+      responses:
+        '200':
+          description: Последний / идущий прогон сбора
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/CollectionRun'
+              example:
+                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                startedAt: "2026-05-23T14:00:00"
+                finishedAt: null
+                sinceDate: "2026-05-10T00:00:00"
+                untilDate: "2026-05-23T14:00:00"
+                status: "RUNNING"
+                errorMessage: null
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
@@ -108,5 +147,59 @@ paths:
                 errorMessage: null
         '404':
           $ref: 'shared.yaml#/components/responses/NotFound'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /collection/runs/{id}/cancel:
+    post:
+      tags:
+        - Collection
+      summary: Отменить идущий прогон сбора
+      description: |
+        Кооперативная отмена: ставит флаг отмены на прогон. Идущий сбор останавливается
+        в ближайшей безопасной точке (между репозиториями / фазами), помечается CANCELLED,
+        advisory-lock освобождается. Отмена **асинхронна** — сразу 202, финальный статус
+        наблюдать через GET /collection/runs/{id} (RUNNING → CANCELLED).
+
+        Консистентность как у FAILED: курсор не двигается, daily_stats может быть временно
+        неполным — следующий сбор доберёт недостающее (mark-and-sweep + recompute).
+      operationId: cancelCollectionRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Uuid'
+          description: ID прогона для отмены
+      responses:
+        '202':
+          description: Отмена запрошена; прогон остановится в ближайшей safe-точке
+          content:
+            application/json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/CollectionRun'
+              example:
+                id: "f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+                startedAt: "2026-05-23T14:00:00"
+                finishedAt: null
+                sinceDate: "2026-05-10T00:00:00"
+                untilDate: "2026-05-23T14:00:00"
+                status: "RUNNING"
+                errorMessage: null
+        '404':
+          $ref: 'shared.yaml#/components/responses/NotFound'
+        '409':
+          description: |
+            Прогон уже в терминальном статусе (SUCCESS / FAILED / CANCELLED) — отменять нечего.
+          content:
+            application/problem+json:
+              schema:
+                $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+              example:
+                type: "urn:devpulse:problem:conflict"
+                title: "Collection run not cancellable"
+                status: 409
+                detail: "Run is already in a terminal state (SUCCESS/FAILED/CANCELLED)."
+                instance: "/api/v2/collection/runs/f1a4c0d2-5e6f-7a8b-9c0d-1e2f3a4b5c6d/cancel"
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
