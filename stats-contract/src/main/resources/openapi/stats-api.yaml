@@ -117,8 +117,11 @@ paths:
         коммитов на клиент. Пустые ячейки (0 коммитов) могут опускаться — клиент
         достраивает полную сетку.
 
-        Параметр email опционален: с ним — один автор (для профиля), без него — вся
-        команда (для Activity-страницы).
+        Фильтры опциональны и независимы:
+        - `email` — один автор (для профиля);
+        - `team` — только участники команды (для Activity-страницы; членство по
+          `unified_user.team`, коммиты без сопоставленного пользователя в выборку не входят);
+        - без фильтров — агрегат по всем.
       operationId: getHourlyStats
       parameters:
         - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
@@ -128,8 +131,17 @@ paths:
           required: false
           schema:
             $ref: 'shared.yaml#/components/schemas/Email'
-          description: Email автора для фильтрации. Без параметра — агрегат по всей команде.
+          description: Email автора для фильтрации. Без параметра — агрегат по всем.
           example: "boris@x5.ru"
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Команда для фильтрации (значение `unified_user.team`). Без параметра — без
+            ограничения по команде. Несуществующая команда даёт пустую матрицу.
+          example: "Platform"
       responses:
         '200':
           description: Почасовая статистика
