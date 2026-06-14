@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DevPulse - Stats API
-  version: 1.0.0
+  version: 1.1.0
   description: API для получения статистики по разработчикам
 
 servers:
@@ -13,12 +13,116 @@ servers:
 tags:
   - name: Stats
     description: Статистика по разработчикам
+  - name: Cohorts
+    description: Когорты и удержание (лонгитюд по истории коммитов)
 
 # Auth handled outside the contract (gateway / SSO). API exposes no
 # operation-level security requirements.
 security: []
 
 paths:
+  /cohorts/retention:
+    get:
+      tags:
+        - Cohorts
+      summary: Retention-треугольник по когортам (месяц первой активности)
+      description: |
+        Когорта = месяц первой активности разработчика (≥ minCommits не-мердж коммитов в месяце).
+        retention[k] = доля разработчиков когорты, активных через k месяцев; retention[0] == 1.
+        Считается из истории коммитов (commit_details/daily_author_stats), без снапшотов.
+        Окно from/to — диапазон истории (по умолчанию вся доступная).
+      operationId: getCohortRetention
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по текущей команде разработчика (unified_user.team)
+        - name: minCommits
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 1
+            minimum: 1
+          description: Порог «активен» — минимум не-мердж коммитов в месяце
+      responses:
+        '200':
+          description: Треугольник удержания
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortRetention'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /cohorts/activity-matrix:
+    get:
+      tags:
+        - Cohorts
+      summary: Матрица активности «разработчик × месяц»
+      description: |
+        Для каждого разработчика — не-мердж коммиты по месяцам (cells выровнены по months),
+        первый/последний активный месяц. Источник — история коммитов, без снапшотов.
+      operationId: getCohortActivityMatrix
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по текущей команде разработчика (unified_user.team)
+      responses:
+        '200':
+          description: Матрица активности
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CohortActivityMatrix'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /cohorts/tier-transitions:
+    get:
+      tags:
+        - Cohorts
+      summary: Матрица переходов тиров активности месяц-к-месяцу
+      description: |
+        4×4 матрица: доля переходов INACTIVE/BELOW_AVERAGE/ACTIVE/STAR из тира в тир между
+        соседними месяцами, усреднённая по окну. Строки — откуда, сумма строки = 1.
+        Тир за месяц пересчитывается из коммитов того месяца (ActivityScorer) — снапшоты не нужны.
+      operationId: getTierTransitions
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/OptionalPeriodTo'
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Фильтр по текущей команде разработчика (unified_user.team)
+      responses:
+        '200':
+          description: Матрица переходов тиров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TierTransitions'
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
   /stats/daily:
     get:
       tags:
@@ -359,6 +463,107 @@ paths:
 
 components:
   schemas:
+    CohortRetention:
+      type: object
+      description: Retention-треугольник по когортам (месяц первой активности).
+      required:
+        - interval
+        - cohorts
+      properties:
+        interval:
+          type: string
+          enum: [month]
+        cohorts:
+          type: array
+          items:
+            type: object
+            required:
+              - cohort
+              - size
+              - retention
+            properties:
+              cohort:
+                type: string
+                description: "Месяц первой активности, 'YYYY-MM'"
+                example: "2026-01"
+              size:
+                type: integer
+                format: int32
+                description: Сколько разработчиков впервые активны в этот месяц
+              retention:
+                type: array
+                description: "Доли 0..1 по смещению k; retention[0] == 1"
+                items:
+                  type: number
+                  format: double
+
+    CohortActivityMatrix:
+      type: object
+      description: Матрица активности «разработчик × месяц» (не-мердж коммиты).
+      required:
+        - months
+        - developers
+      properties:
+        months:
+          type: array
+          description: "Ось колонок, 'YYYY-MM' по возрастанию"
+          items:
+            type: string
+        developers:
+          type: array
+          items:
+            type: object
+            required:
+              - email
+              - firstActive
+              - lastActive
+              - cells
+            properties:
+              email:
+                $ref: 'shared.yaml#/components/schemas/Email'
+              displayName:
+                type: string
+                nullable: true
+              avatarUrl:
+                type: string
+                nullable: true
+              team:
+                type: string
+                nullable: true
+              firstActive:
+                type: string
+                example: "2026-01"
+              lastActive:
+                type: string
+                example: "2026-06"
+              cells:
+                type: array
+                description: "Не-мердж коммиты по месяцам (выровнены по months); 0 = неактивен"
+                items:
+                  type: integer
+                  format: int32
+
+    TierTransitions:
+      type: object
+      description: 4×4 матрица переходов тиров активности месяц-к-месяцу.
+      required:
+        - tiers
+        - matrix
+      properties:
+        tiers:
+          type: array
+          items:
+            type: string
+            enum: [INACTIVE, BELOW_AVERAGE, ACTIVE, STAR]
+        matrix:
+          type: array
+          description: "Строки — откуда, сумма строки = 1"
+          items:
+            type: array
+            items:
+              type: number
+              format: double
+
     PerformanceReview:
       type: object
       description: Досье к perf-review по одному человеку за период.
