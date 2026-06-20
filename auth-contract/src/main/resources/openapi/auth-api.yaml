@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: DevPulse - Auth API
+  version: 1.0.0
+  description: |
+    Аутентификация (ADR-13). Два входа на общий pipeline identity → проверка доступа к
+    проектам → провижининг → роль:
+    - **PAT**: `POST /auth/login` с GitLab access token;
+    - **OAuth2**: кнопка → `GET /oauth2/authorization/gitlab` (редирект на GitLab) → callback
+      `/login/oauth2/code/gitlab`. Эти два — браузерные редиректы Spring Security на корне
+      (вне `/api/v2`), НЕ JSON-эндпоинты — в контракте не описаны.
+
+    Сессия — httpOnly-cookie `SESSION` (Spring Session JDBC). Роль (`MEMBER|TEAMLEAD|ADMIN`)
+    деривится (ADMIN из конфига, TEAMLEAD из `is_lead`), в БД не хранится.
+
+servers:
+  - url: http://localhost:8080/api/v2
+    description: Локальный сервер разработки
+  - url: https://api.devpulse.dev/api/v2
+    description: Продакшн сервер
+
+tags:
+  - name: Auth
+    description: Аутентификация и текущий пользователь
+
+# По умолчанию — без требования (login/config публичны); защищённые операции
+# переопределяют security на CookieAuth ниже.
+security: []
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Вход по GitLab access token (PAT)
+      description: |
+        Валидирует токен через `GET /user` GitLab, проверяет доступ (≥ Developer хотя бы к
+        одному отслеживаемому проекту, либо членство в `auth.admins`), провижинит пользователя,
+        поднимает сессию (cookie `SESSION`). Возвращает профиль + роль.
+      operationId: loginWithToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              token: "glpat-xxxxxxxxxxxxxxxxxxxx"
+      responses:
+        '200':
+          description: Успешный вход — установлена сессия (Set-Cookie SESSION)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+              example:
+                email: "boris@x5.ru"
+                role: "MEMBER"
+                name: "Boris Osechinskiy"
+                avatarUrl: "https://kaiten.x5.ru/.../avatar.png"
+                team: "Platform"
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/InvalidToken'
+        '403':
+          $ref: '#/components/responses/NoProjectAccess'
+        '503':
+          $ref: '#/components/responses/GitUnavailable'
+
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Текущий пользователь
+      description: Профиль и роль аутентифицированного пользователя (из сессии). Без сессии — 401.
+      operationId: getAuthMe
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Текущий пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Выход
+      description: Завершает сессию (инвалидация + удаление cookie SESSION).
+      operationId: logout
+      security:
+        - CookieAuth: []
+      responses:
+        '204':
+          description: Сессия завершена
+
+  /auth/config:
+    get:
+      tags:
+        - Auth
+      summary: Публичная конфигурация аутентификации
+      description: |
+        Доступен ли вход через GitLab OAuth2 (настроена ли регистрация клиента). Фронт
+        показывает кнопку «Войти через GitLab» только при `oauthEnabled = true`.
+      operationId: getAuthConfig
+      security: []
+      responses:
+        '200':
+          description: Конфигурация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthConfigResponse'
+              example:
+                oauthEnabled: true
+
+components:
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: SESSION
+      description: httpOnly-cookie сессии (Spring Session JDBC). Ставится при логине.
+
+  schemas:
+    Role:
+      type: string
+      enum: [MEMBER, TEAMLEAD, ADMIN]
+      description: |
+        Роль для RBAC (ADR-13). `ADMIN`/`TEAMLEAD` — полный доступ; `MEMBER` —
+        ограниченный (perf-review только по себе; compare/cohorts/teams недоступны).
+      example: "MEMBER"
+
+    LoginRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: GitLab access token (PAT) с правом read_user.
+          example: "glpat-xxxxxxxxxxxxxxxxxxxx"
+
+    AuthMeResponse:
+      type: object
+      description: Текущий пользователь — ответ `/auth/login` и `/auth/me`.
+      required:
+        - email
+        - role
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        role:
+          $ref: '#/components/schemas/Role'
+        name:
+          type: string
+          nullable: true
+          description: Отображаемое имя (из Kaiten/GitLab), может быть null.
+          example: "Boris Osechinskiy"
+        avatarUrl:
+          type: string
+          nullable: true
+          description: URL аватара, может быть null.
+          example: "https://kaiten.x5.ru/.../avatar.png"
+        team:
+          type: string
+          nullable: true
+          description: Команда (unified_user.team), может быть null.
+          example: "Platform"
+
+    AuthConfigResponse:
+      type: object
+      required:
+        - oauthEnabled
+      properties:
+        oauthEnabled:
+          type: boolean
+          description: Настроен ли вход через GitLab OAuth2.
+          example: true
+
+  responses:
+    Unauthorized:
+      description: Нет сессии / сессия истекла
+      content:
+        application/problem+json:
+          schema:
+            $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+          example:
+            type: "urn:devpulse:problem:unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "Authentication required"
+            instance: "/api/v2/auth/me"
+
+    InvalidToken:
+      description: GitLab отклонил токен (невалиден/отозван)
+      content:
+        application/problem+json:
+          schema:
+            $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+          example:
+            type: "about:blank"
+            title: "Unauthorized"
+            status: 401
+            detail: "GitLab отклонил токен: 401 UNAUTHORIZED"
+            instance: "/api/v2/auth/login"
+
+    NoProjectAccess:
+      description: Валидный пользователь GitLab, но без доступа ≥ Developer к отслеживаемым проектам (и не админ)
+      content:
+        application/problem+json:
+          schema:
+            $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+          example:
+            type: "about:blank"
+            title: "Forbidden"
+            status: 403
+            detail: "No Developer access to tracked projects: boris@x5.ru"
+            instance: "/api/v2/auth/login"
+
+    GitUnavailable:
+      description: GitLab недоступен — токен проверить не удалось
+      content:
+        application/problem+json:
+          schema:
+            $ref: 'shared.yaml#/components/schemas/ProblemDetails'
+          example:
+            type: "about:blank"
+            title: "Service Unavailable"
+            status: 503
+            detail: "GitLab недоступен — не удалось проверить токен"
+            instance: "/api/v2/auth/login"

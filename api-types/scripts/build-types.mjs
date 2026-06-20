@@ -56,6 +56,7 @@ const domains = [
   ['stats', 'stats-api.yaml'],
   ['users', 'users-api.yaml'],
   ['kaiten', 'kaiten-api.yaml'],
+  ['auth', 'auth-api.yaml'],
 ].map(([module, file]) => readYaml(specPath(module, file)));
 
 const COMPONENT_KEYS = ['schemas', 'parameters', 'responses', 'securitySchemes'];
