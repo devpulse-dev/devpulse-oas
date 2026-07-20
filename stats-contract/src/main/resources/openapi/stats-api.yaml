@@ -499,10 +499,12 @@ paths:
                     to: "2026-04-30"
                     total: 14
                     byPriority: { critical: 2, high: 5, medium: 4, low: 3, unknown: 0 }
+                    aiAgentCount: 6
                   - from: "2026-05-01"
                     to: "2026-05-31"
                     total: 9
                     byPriority: { critical: 1, high: 2, medium: 4, low: 2, unknown: 0 }
+                    aiAgentCount: 3
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':
@@ -623,6 +625,7 @@ components:
         - to
         - total
         - byPriority
+        - aiAgentCount
       properties:
         from:
           $ref: 'shared.yaml#/components/schemas/Date'
@@ -634,6 +637,12 @@ components:
           example: 14
         byPriority:
           $ref: '#/components/schemas/PriorityCounts'
+        aiAgentCount:
+          type: integer
+          description: |
+            Сколько из дефектов периода с проставленной галкой «AI-Agent» (Kaiten property
+            id_6064 = true). Доля = aiAgentCount / total. Всегда ≤ total.
+          example: 6
 
     DefectsByPeriodResponse:
       type: object
