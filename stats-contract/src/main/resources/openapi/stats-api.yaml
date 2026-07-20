@@ -644,11 +644,62 @@ components:
             id_6064 = true). Доля = aiAgentCount / total. Всегда ≤ total.
           example: 6
 
+    DefectMember:
+      type: object
+      description: Участник карточки дефекта (резолв KaitenUserId → unified_user).
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        displayName:
+          type: string
+          nullable: true
+          example: "Boris Osechinskiy"
+        avatarUrl:
+          type: string
+          nullable: true
+          example: "https://kaiten.x5.ru/.../avatar.png"
+
+    DefectItem:
+      type: object
+      description: Отдельный дефект для детальной таблицы (уникален по id).
+      required:
+        - id
+        - title
+        - createdAt
+        - aiAgent
+        - members
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Id карточки Kaiten.
+          example: 150766
+        title:
+          type: string
+          example: "Не грузится отчёт по остаткам"
+        url:
+          type: string
+          nullable: true
+          description: Ссылка на карточку в Kaiten (может отсутствовать).
+          example: "https://kaiten.x5.ru/150766"
+        createdAt:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+        aiAgent:
+          type: boolean
+          description: Проставлена ли галка «AI-Agent» (Kaiten property id_6064).
+          example: false
+        members:
+          type: array
+          description: Участники карточки (резолвнутые в unified_user), для аватарок.
+          items:
+            $ref: '#/components/schemas/DefectMember'
+
     DefectsByPeriodResponse:
       type: object
       required:
         - team
         - periods
+        - defects
       properties:
         team:
           type: string
@@ -658,6 +709,13 @@ components:
           description: Результат по периодам (в том же порядке, что в запросе).
           items:
             $ref: '#/components/schemas/PeriodDefects'
+        defects:
+          type: array
+          description: |
+            Уникальные дефекты (дедуп по id), попавшие хотя бы в один из периодов по createdAt —
+            для детальной таблицы (кто участвовал, есть ли AI-агент, когда заведён).
+          items:
+            $ref: '#/components/schemas/DefectItem'
 
     # ---- Вмерженные MR по команде ----
     MergedMrByAuthor:
