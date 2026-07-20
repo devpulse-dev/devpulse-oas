@@ -548,6 +548,11 @@ paths:
                     displayName: "Alice A"
                     avatarUrl: null
                     count: 16
+                byRepo:
+                  - repo: "gkr/xrg-markable"
+                    count: 23
+                  - repo: "gkr/xrg-core"
+                    count: 14
         '400':
           $ref: 'shared.yaml#/components/responses/BadRequest'
         '500':
@@ -667,6 +672,21 @@ components:
           description: Сколько MR вмержено этим автором за период.
           example: 21
 
+    MergedMrByRepo:
+      type: object
+      required:
+        - repo
+        - count
+      properties:
+        repo:
+          type: string
+          description: Путь репозитория (`namespace/repo`), выведен из web_url MR.
+          example: "gkr/xrg-markable"
+        count:
+          type: integer
+          description: Сколько MR вмержено в этом репозитории за период.
+          example: 14
+
     MergedMrStats:
       type: object
       required:
@@ -675,6 +695,7 @@ components:
         - to
         - total
         - authors
+        - byRepo
       properties:
         team:
           type: string
@@ -692,6 +713,13 @@ components:
           description: Разбивка по авторам (убыв. по count).
           items:
             $ref: '#/components/schemas/MergedMrByAuthor'
+        byRepo:
+          type: array
+          description: |
+            Разбивка того же total по репозиториям (убыв. по count) — независимый
+            срез. Сумма count по byRepo равна сумме по authors и равна total.
+          items:
+            $ref: '#/components/schemas/MergedMrByRepo'
 
     CohortRetention:
       type: object
