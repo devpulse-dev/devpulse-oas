@@ -461,8 +461,406 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /stats/defects:
+    post:
+      tags:
+        - Stats
+      summary: Дефекты по приоритету, команда, несколько периодов
+      description: |
+        Количество ДЕФЕКТОВ (Kaiten cardType=DEFECT) по приоритету (urgency) для выбранной
+        команды за 1..10 периодов. Дефект считается ОДИН раз (дедуп по id карточки), даже если
+        в карточке несколько участников команды. Попадание в период — по `createdAt` (дефект
+        заведён в периоде). Данные тянутся live из Kaiten по участникам команды.
+      operationId: getTeamDefects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DefectsByPeriodRequest'
+            example:
+              team: "Platform"
+              periods:
+                - from: "2026-04-01"
+                  to: "2026-04-30"
+                - from: "2026-05-01"
+                  to: "2026-05-31"
+      responses:
+        '200':
+          description: Дефекты по приоритету по периодам
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DefectsByPeriodResponse'
+              example:
+                team: "Platform"
+                periods:
+                  - from: "2026-04-01"
+                    to: "2026-04-30"
+                    total: 14
+                    byPriority: { critical: 2, high: 5, medium: 4, low: 3, unknown: 0 }
+                    aiAgentCount: 6
+                  - from: "2026-05-01"
+                    to: "2026-05-31"
+                    total: 9
+                    byPriority: { critical: 1, high: 2, medium: 4, low: 2, unknown: 0 }
+                    aiAgentCount: 3
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /stats/defects/ai-agent:
+    post:
+      tags:
+        - Stats
+      summary: Проставить дефектам флаг «AI-Agent» в Kaiten
+      description: |
+        Выставляет в карточках Kaiten property `id_6064 = true` (флаг «AI-Agent») для переданных
+        id. Set-only: снять флаг через API нельзя. Идемпотентно. Только ADMIN/TEAMLEAD.
+
+        Kaiten пишется по ~4 запроса/сек (глобальный rate-limit), поэтому для большого списка
+        запрос выполняется десятки секунд — клиенту нужен длинный таймаут.
+      operationId: markDefectsAiAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkDefectsAiAgentRequest'
+            example:
+              cardIds: [150766, 273814]
+      responses:
+        '200':
+          description: Результат простановки (сколько обновлено, какие не удалось)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkDefectsAiAgentResponse'
+              example:
+                requested: 2
+                updated: 2
+                failedIds: []
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
+  /stats/merged-mrs:
+    get:
+      tags:
+        - Stats
+      summary: Вмерженные MR по команде
+      description: |
+        Сколько MR вмержено командой за период (`merged_at ∈ [from,to]`, автор — участник
+        команды) + разбивка по авторам. Данные из БД (собранные ревью-метрики).
+      operationId: getMergedMrStats
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: team
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Команда (значение `unified_user.team`).
+          example: "Platform"
+      responses:
+        '200':
+          description: Статистика вмерженных MR
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergedMrStats'
+              example:
+                team: "Platform"
+                from: "2026-05-01"
+                to: "2026-05-31"
+                total: 37
+                authors:
+                  - email: "boris@x5.ru"
+                    displayName: "Boris Osechinskiy"
+                    avatarUrl: "https://kaiten.x5.ru/.../avatar.png"
+                    count: 21
+                  - email: "alice@x5.ru"
+                    displayName: "Alice A"
+                    avatarUrl: null
+                    count: 16
+                byRepo:
+                  - repo: "gkr/xrg-markable"
+                    count: 23
+                  - repo: "gkr/xrg-core"
+                    count: 14
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
 components:
   schemas:
+    # ---- Дефекты по приоритету × команда × периоды ----
+    DefectsByPeriodRequest:
+      type: object
+      required:
+        - team
+        - periods
+      properties:
+        team:
+          type: string
+          description: Команда (значение `unified_user.team`).
+          example: "Platform"
+        periods:
+          type: array
+          minItems: 1
+          maxItems: 10
+          description: Периоды (до 10), за каждый считается разбивка по приоритету.
+          items:
+            $ref: '#/components/schemas/PeriodRange'
+
+    PeriodRange:
+      type: object
+      required:
+        - from
+        - to
+      properties:
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+
+    PriorityCounts:
+      type: object
+      description: Счётчики дефектов по приоритету (Kaiten urgency).
+      required:
+        - critical
+        - high
+        - medium
+        - low
+        - unknown
+      properties:
+        critical:
+          type: integer
+          example: 2
+        high:
+          type: integer
+          example: 5
+        medium:
+          type: integer
+          example: 4
+        low:
+          type: integer
+          example: 3
+        unknown:
+          type: integer
+          example: 0
+
+    PeriodDefects:
+      type: object
+      required:
+        - from
+        - to
+        - total
+        - byPriority
+        - aiAgentCount
+      properties:
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        total:
+          type: integer
+          description: Всего уникальных дефектов в периоде.
+          example: 14
+        byPriority:
+          $ref: '#/components/schemas/PriorityCounts'
+        aiAgentCount:
+          type: integer
+          description: |
+            Сколько из дефектов периода с проставленной галкой «AI-Agent» (Kaiten property
+            id_6064 = true). Доля = aiAgentCount / total. Всегда ≤ total.
+          example: 6
+
+    DefectMember:
+      type: object
+      description: Участник карточки дефекта (резолв KaitenUserId → unified_user).
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        displayName:
+          type: string
+          nullable: true
+          example: "Boris Osechinskiy"
+        avatarUrl:
+          type: string
+          nullable: true
+          example: "https://kaiten.x5.ru/.../avatar.png"
+
+    DefectItem:
+      type: object
+      description: Отдельный дефект для детальной таблицы (уникален по id).
+      required:
+        - id
+        - title
+        - createdAt
+        - aiAgent
+        - members
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Id карточки Kaiten.
+          example: 150766
+        title:
+          type: string
+          example: "Не грузится отчёт по остаткам"
+        url:
+          type: string
+          nullable: true
+          description: Ссылка на карточку в Kaiten (может отсутствовать).
+          example: "https://kaiten.x5.ru/150766"
+        createdAt:
+          $ref: 'shared.yaml#/components/schemas/DateTime'
+        aiAgent:
+          type: boolean
+          description: Проставлена ли галка «AI-Agent» (Kaiten property id_6064).
+          example: false
+        members:
+          type: array
+          description: Участники карточки (резолвнутые в unified_user), для аватарок.
+          items:
+            $ref: '#/components/schemas/DefectMember'
+
+    DefectsByPeriodResponse:
+      type: object
+      required:
+        - team
+        - periods
+        - defects
+      properties:
+        team:
+          type: string
+          example: "Platform"
+        periods:
+          type: array
+          description: Результат по периодам (в том же порядке, что в запросе).
+          items:
+            $ref: '#/components/schemas/PeriodDefects'
+        defects:
+          type: array
+          description: |
+            Уникальные дефекты (дедуп по id), попавшие хотя бы в один из периодов по createdAt —
+            для детальной таблицы (кто участвовал, есть ли AI-агент, когда заведён).
+          items:
+            $ref: '#/components/schemas/DefectItem'
+
+    MarkDefectsAiAgentRequest:
+      type: object
+      required:
+        - cardIds
+      properties:
+        cardIds:
+          type: array
+          minItems: 1
+          description: Id карточек Kaiten, которым проставить флаг «AI-Agent».
+          items:
+            type: integer
+            format: int64
+          example: [150766, 273814]
+
+    MarkDefectsAiAgentResponse:
+      type: object
+      required:
+        - requested
+        - updated
+        - failedIds
+      properties:
+        requested:
+          type: integer
+          description: Сколько id пришло в запросе.
+          example: 2
+        updated:
+          type: integer
+          description: Сколько карточек успешно обновлено.
+          example: 2
+        failedIds:
+          type: array
+          description: Id карточек, которые не удалось обновить (ошибка Kaiten).
+          items:
+            type: integer
+            format: int64
+          example: []
+
+    # ---- Вмерженные MR по команде ----
+    MergedMrByAuthor:
+      type: object
+      required:
+        - email
+        - count
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        displayName:
+          type: string
+          nullable: true
+          example: "Boris Osechinskiy"
+        avatarUrl:
+          type: string
+          nullable: true
+          example: "https://kaiten.x5.ru/.../avatar.png"
+        count:
+          type: integer
+          description: Сколько MR вмержено этим автором за период.
+          example: 21
+
+    MergedMrByRepo:
+      type: object
+      required:
+        - repo
+        - count
+      properties:
+        repo:
+          type: string
+          description: Путь репозитория (`namespace/repo`), выведен из web_url MR.
+          example: "gkr/xrg-markable"
+        count:
+          type: integer
+          description: Сколько MR вмержено в этом репозитории за период.
+          example: 14
+
+    MergedMrStats:
+      type: object
+      required:
+        - team
+        - from
+        - to
+        - total
+        - authors
+        - byRepo
+      properties:
+        team:
+          type: string
+          example: "Platform"
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        total:
+          type: integer
+          description: Всего вмержено MR командой за период.
+          example: 37
+        authors:
+          type: array
+          description: Разбивка по авторам (убыв. по count).
+          items:
+            $ref: '#/components/schemas/MergedMrByAuthor'
+        byRepo:
+          type: array
+          description: |
+            Разбивка того же total по репозиториям (убыв. по count) — независимый
+            срез. Сумма count по byRepo равна сумме по authors и равна total.
+          items:
+            $ref: '#/components/schemas/MergedMrByRepo'
+
     CohortRetention:
       type: object
       description: Retention-треугольник по когортам (месяц первой активности).
