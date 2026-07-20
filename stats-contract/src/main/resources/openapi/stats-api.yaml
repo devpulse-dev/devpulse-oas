@@ -130,13 +130,36 @@ paths:
       summary: Получить дневную статистику
       description: |
         Дневные агрегаты за период (по ключу email × date × repo).
-        
-        Здесь displayName/avatarUrl НЕ возвращаются — дневных записей много (тысячи за период), enrichment дорогой. 
+
+        Здесь displayName/avatarUrl НЕ возвращаются — дневных записей много (тысячи за период), enrichment дорогой.
         Если нужны профили — фронт может агрегировать по email на своей стороне и подтянуть из /dashboard или /users/{email}/profile.
+
+        Фильтры опциональны и независимы (как у /stats/hourly), фильтрация выполняется в БД:
+        - `email` — один автор (для профиля);
+        - `team` — только участники команды (членство по `unified_user.team`);
+        - без фильтров — все авторы за период.
+        Фильтр в БД избавляет от подъёма всех daily-строк периода в память при типичном запросе
+        по одному разработчику/команде.
       operationId: getDailyStats
       parameters:
         - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
         - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: email
+          in: query
+          required: false
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email автора для фильтрации. Без параметра — все авторы.
+          example: "boris@x5.ru"
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Команда для фильтрации (значение `unified_user.team`). Без параметра — без
+            ограничения по команде. Несуществующая команда даёт пустой результат.
+          example: "Platform"
       responses:
         '200':
           description: Дневная статистика
