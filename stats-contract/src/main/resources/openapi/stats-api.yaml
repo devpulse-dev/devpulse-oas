@@ -510,6 +510,42 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /stats/defects/ai-agent:
+    post:
+      tags:
+        - Stats
+      summary: Проставить дефектам флаг «AI-Agent» в Kaiten
+      description: |
+        Выставляет в карточках Kaiten property `id_6064 = true` (флаг «AI-Agent») для переданных
+        id. Set-only: снять флаг через API нельзя. Идемпотентно. Только ADMIN/TEAMLEAD.
+
+        Kaiten пишется по ~4 запроса/сек (глобальный rate-limit), поэтому для большого списка
+        запрос выполняется десятки секунд — клиенту нужен длинный таймаут.
+      operationId: markDefectsAiAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkDefectsAiAgentRequest'
+            example:
+              cardIds: [150766, 273814]
+      responses:
+        '200':
+          description: Результат простановки (сколько обновлено, какие не удалось)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkDefectsAiAgentResponse'
+              example:
+                requested: 2
+                updated: 2
+                failedIds: []
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
   /stats/merged-mrs:
     get:
       tags:
@@ -716,6 +752,43 @@ components:
             для детальной таблицы (кто участвовал, есть ли AI-агент, когда заведён).
           items:
             $ref: '#/components/schemas/DefectItem'
+
+    MarkDefectsAiAgentRequest:
+      type: object
+      required:
+        - cardIds
+      properties:
+        cardIds:
+          type: array
+          minItems: 1
+          description: Id карточек Kaiten, которым проставить флаг «AI-Agent».
+          items:
+            type: integer
+            format: int64
+          example: [150766, 273814]
+
+    MarkDefectsAiAgentResponse:
+      type: object
+      required:
+        - requested
+        - updated
+        - failedIds
+      properties:
+        requested:
+          type: integer
+          description: Сколько id пришло в запросе.
+          example: 2
+        updated:
+          type: integer
+          description: Сколько карточек успешно обновлено.
+          example: 2
+        failedIds:
+          type: array
+          description: Id карточек, которые не удалось обновить (ошибка Kaiten).
+          items:
+            type: integer
+            format: int64
+          example: []
 
     # ---- Вмерженные MR по команде ----
     MergedMrByAuthor:
