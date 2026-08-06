@@ -569,6 +569,51 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /stats/timesheet:
+    get:
+      tags:
+        - Stats
+      summary: Трудозатраты разработчика по дням (таймшит)
+      description: |
+        Списанное время одного разработчика за период, разложенное по дням (`for_date`).
+        Источник — live `GET /time-logs` Kaiten по `kaiten_id` пользователя; в БД не хранится.
+
+        Время передаётся в **минутах** (целое, как в Kaiten `time_spent`) — без потерь на
+        округлении; клиент форматирует в часы. Дни без списаний в ответе отсутствуют.
+        Если у пользователя нет привязки к Kaiten — вернётся пустой таймшит.
+      operationId: getTimesheet
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: email
+          in: query
+          required: true
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Разработчик, чей таймшит запрашиваем.
+      responses:
+        '200':
+          description: Таймшит разработчика
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+              example:
+                email: "boris@x5.ru"
+                from: "2026-05-01"
+                to: "2026-05-31"
+                totalMinutes: 9600
+                loggedDays: 18
+                days:
+                  - date: "2026-05-04"
+                    minutes: 480
+                  - date: "2026-05-05"
+                    minutes: 510
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
   /stats/merged-mrs:
     get:
       tags:
@@ -775,6 +820,49 @@ components:
             для детальной таблицы (кто участвовал, есть ли AI-агент, когда заведён).
           items:
             $ref: '#/components/schemas/DefectItem'
+
+    TimesheetDay:
+      type: object
+      required:
+        - date
+        - minutes
+      properties:
+        date:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        minutes:
+          type: integer
+          description: Списано минут за этот день (сумма `time_spent` всех логов).
+          example: 480
+
+    Timesheet:
+      type: object
+      required:
+        - email
+        - from
+        - to
+        - totalMinutes
+        - loggedDays
+        - days
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        totalMinutes:
+          type: integer
+          description: Всего списано минут за период.
+          example: 9600
+        loggedDays:
+          type: integer
+          description: Сколько дней периода с ненулевым списанием (для «среднего за день»).
+          example: 18
+        days:
+          type: array
+          description: Дни со списаниями, по возрастанию даты. Пустые дни не включаются.
+          items:
+            $ref: '#/components/schemas/TimesheetDay'
 
     MarkDefectsAiAgentRequest:
       type: object

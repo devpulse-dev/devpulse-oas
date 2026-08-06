@@ -37,13 +37,13 @@ devpulse-oas/
 
 | Модуль | Maven Artifact | Описание | Версия |
 |--------|----------------|----------|--------|
-| **shared-contract** | `com.devpulse:shared-contract` | Общие схемы (UUID, DateTime, Error, UserProfile, AuthorSummary, ReviewAuthor, Team…), security схемы | `3.8.0` |
-| **collection-contract** | `com.devpulse:collection-contract` | API для управления сбором данных из Git и Kaiten | `3.8.0` |
-| **dashboard-contract** | `com.devpulse:dashboard-contract` | API для дашборда с пагинацией авторов | `3.8.0` |
-| **stats-contract** | `com.devpulse:stats-contract` | Статистика (daily/weekly/summary/reviews) + performance review + дефекты по приоритету, вмерженные MR, простановка AI-Agent | `3.8.0` |
-| **users-contract** | `com.devpulse:users-contract` | Профили, коммиты, список пользователей, команды и лиды | `3.8.0` |
-| **kaiten-contract** | `com.devpulse:kaiten-contract` | API для интеграции с Kaiten | `3.8.0` |
-| **auth-contract** | `com.devpulse:auth-contract` | Аутентификация (GitLab PAT + OAuth2), текущий пользователь, RBAC-роли | `3.8.0` |
+| **shared-contract** | `com.devpulse:shared-contract` | Общие схемы (UUID, DateTime, Error, UserProfile, AuthorSummary, ReviewAuthor, Team…), security схемы | `3.10.0` |
+| **collection-contract** | `com.devpulse:collection-contract` | API для управления сбором данных из Git и Kaiten | `3.10.0` |
+| **dashboard-contract** | `com.devpulse:dashboard-contract` | API для дашборда с пагинацией авторов | `3.10.0` |
+| **stats-contract** | `com.devpulse:stats-contract` | Статистика (daily/weekly/summary/reviews) + performance review + дефекты по приоритету, вмерженные MR, простановка AI-Agent, таймшит | `3.10.0` |
+| **users-contract** | `com.devpulse:users-contract` | Профили, коммиты, список пользователей, команды и лиды | `3.10.0` |
+| **kaiten-contract** | `com.devpulse:kaiten-contract` | API для интеграции с Kaiten | `3.10.0` |
+| **auth-contract** | `com.devpulse:auth-contract` | Аутентификация (GitLab PAT + OAuth2), текущий пользователь, RBAC-роли | `3.10.0` |
 
 > Версии — lockstep: все модули публикуются одной версией (единый `<revision>` в корневом `pom.xml`).
 
@@ -51,7 +51,7 @@ devpulse-oas/
 
 | Пакет | Содержимое | Версия |
 |-------|------------|--------|
-| **`@devpulse-dev/api-types`** | TypeScript-типы (`components`/`paths`/`operations`) + bundled `openapi.json` на весь API | `3.8.0` |
+| **`@devpulse-dev/api-types`** | TypeScript-типы (`components`/`paths`/`operations`) + bundled `openapi.json` на весь API | `3.10.0` |
 
 ## 🚀 Быстрый старт
 
@@ -79,32 +79,32 @@ cd devpulse-oas
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>collection-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>dashboard-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>stats-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>users-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>kaiten-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
     <dependency>
         <groupId>com.devpulse</groupId>
         <artifactId>shared-contract</artifactId>
-        <version>3.8.0</version>
+        <version>3.10.0</version>
     </dependency>
 </dependencies>
 ```
@@ -207,6 +207,8 @@ Semver: additive = minor, breaking = major, доки = patch. Релиз:
   - Возвращает разбивку по приоритету + `aiAgentCount` на период и плоский список дефектов (`DefectItem`: участники, ссылка, AI-флаг, дата)
 - `POST /api/v2/stats/defects/ai-agent` — проставить карточкам флаг «AI-Agent» (Kaiten property `id_6064=true`)
   - Тело: `{ cardIds: [...] }`; set-only, идемпотентно; **только ADMIN/TEAMLEAD**
+- `GET /api/v2/stats/timesheet` — таймшит разработчика (`from`, `to`, `email`)
+  - Трудозатраты по дням из Kaiten `time-logs` (`for_date`); время в **минутах**, клиент форматирует в часы
 - `GET /api/v2/stats/merged-mrs` — вмерженные MR по команде за период (`from`, `to`, `team`)
   - Считаются MR с `merged_at ∈ периода` в dev-ветки; разбивки по авторам и репозиториям + `total`
 
