@@ -801,6 +801,41 @@ components:
           format: int64
           description: Сумма добавленных строк в этой ячейке (опционально)
           example: 320
+        authors:
+          type: array
+          description: |
+            Кто коммитил в этот час, по убыванию числа коммитов.
+
+            Раньше ячейка была анонимной агрегацией: параметры `email`/`team`
+            фильтруют выборку на входе, но в ответе автора не оставалось, и
+            drill-down по ячейке на фронте собрать было не из чего (в daily есть
+            автор, но нет часа).
+
+            Список полный, не усечённый: ячеек максимум 7×24, а в конкретном часе
+            обычно единицы авторов. Пустой массив — легальное значение для старых
+            ответов; поле опционально, чтобы не ломать существующих клиентов.
+          items:
+            $ref: '#/components/schemas/HourlyCellAuthor'
+
+    # Автор внутри ячейки почасовой сетки
+    HourlyCellAuthor:
+      type: object
+      required:
+        - email
+        - commits
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        commits:
+          type: integer
+          format: int64
+          description: Не-мердж коммиты этого автора в данной ячейке
+          example: 3
+        addedLines:
+          type: integer
+          format: int64
+          description: Добавленные строки этого автора в данной ячейке (опционально)
+          example: 140
 
     # Почасовая статистика: плотная (или разреженная) матрица день-недели × час
     HourlyStats:
