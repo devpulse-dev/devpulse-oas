@@ -130,13 +130,36 @@ paths:
       summary: Получить дневную статистику
       description: |
         Дневные агрегаты за период (по ключу email × date × repo).
-        
-        Здесь displayName/avatarUrl НЕ возвращаются — дневных записей много (тысячи за период), enrichment дорогой. 
+
+        Здесь displayName/avatarUrl НЕ возвращаются — дневных записей много (тысячи за период), enrichment дорогой.
         Если нужны профили — фронт может агрегировать по email на своей стороне и подтянуть из /dashboard или /users/{email}/profile.
+
+        Фильтры опциональны и независимы (как у /stats/hourly), фильтрация выполняется в БД:
+        - `email` — один автор (для профиля);
+        - `team` — только участники команды (членство по `unified_user.team`);
+        - без фильтров — все авторы за период.
+        Фильтр в БД избавляет от подъёма всех daily-строк периода в память при типичном запросе
+        по одному разработчику/команде.
       operationId: getDailyStats
       parameters:
         - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
         - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: email
+          in: query
+          required: false
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Email автора для фильтрации. Без параметра — все авторы.
+          example: "boris@x5.ru"
+        - name: team
+          in: query
+          required: false
+          schema:
+            type: string
+          description: |
+            Команда для фильтрации (значение `unified_user.team`). Без параметра — без
+            ограничения по команде. Несуществующая команда даёт пустой результат.
+          example: "Platform"
       responses:
         '200':
           description: Дневная статистика
@@ -546,6 +569,68 @@ paths:
         '500':
           $ref: 'shared.yaml#/components/responses/InternalError'
 
+  /stats/timesheet:
+    get:
+      tags:
+        - Stats
+      summary: Трудозатраты разработчика по дням (таймшит)
+      description: |
+        Списанное время одного разработчика за период: по дням (`for_date`) и по карточкам внутри дня
+        (на что ушло время, дефект/разработка, галка AI-Agent, связанные MR).
+        Источник — live `GET /time-logs` Kaiten по `kaiten_id` пользователя; в БД не хранится.
+
+        Время передаётся в **минутах** (целое, как в Kaiten `time_spent`) — без потерь на
+        округлении; клиент форматирует в часы. Дни без списаний в ответе отсутствуют.
+        Если у пользователя нет привязки к Kaiten — вернётся пустой таймшит.
+      operationId: getTimesheet
+      parameters:
+        - $ref: 'shared.yaml#/components/parameters/PeriodFrom'
+        - $ref: 'shared.yaml#/components/parameters/PeriodTo'
+        - name: email
+          in: query
+          required: true
+          schema:
+            $ref: 'shared.yaml#/components/schemas/Email'
+          description: Разработчик, чей таймшит запрашиваем.
+      responses:
+        '200':
+          description: Таймшит разработчика
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timesheet'
+              example:
+                email: "boris@x5.ru"
+                from: "2026-05-01"
+                to: "2026-05-31"
+                totalMinutes: 9600
+                loggedDays: 18
+                days:
+                  - date: "2026-05-04"
+                    minutes: 480
+                    entries:
+                      - cardId: 2712833
+                        title: "BO | Маркировка | Приемка от ПП"
+                        url: "https://kaiten.x5.ru/2712833"
+                        type: "DEFECT"
+                        aiAgent: true
+                        minutes: 300
+                        mergeRequests:
+                          - repo: "gkr/xrg-core"
+                            title: "1700-2712833 fix"
+                            url: "https://scm.x5.ru/gkr/xrg-core/-/merge_requests/43413"
+                      - cardId: 2716972
+                        title: "Разработка 69"
+                        url: "https://kaiten.x5.ru/2716972"
+                        type: "DEVELOPMENT"
+                        aiAgent: false
+                        minutes: 180
+                        mergeRequests: []
+        '400':
+          $ref: 'shared.yaml#/components/responses/BadRequest'
+        '500':
+          $ref: 'shared.yaml#/components/responses/InternalError'
+
   /stats/merged-mrs:
     get:
       tags:
@@ -752,6 +837,118 @@ components:
             для детальной таблицы (кто участвовал, есть ли AI-агент, когда заведён).
           items:
             $ref: '#/components/schemas/DefectItem'
+
+    TimesheetMergeRequest:
+      type: object
+      description: MR, связанный с карточкой (номер задачи распарсен из заголовка MR).
+      required:
+        - url
+      properties:
+        repo:
+          type: string
+          nullable: true
+          description: Путь репозитория (`namespace/repo`), выведен из web_url.
+          example: "gkr/xrg-core"
+        title:
+          type: string
+          nullable: true
+          example: "1700-2712833 fix: не грузится отчёт"
+        url:
+          type: string
+          example: "https://scm.x5.ru/gkr/xrg-core/-/merge_requests/43413"
+
+    TimesheetEntry:
+      type: object
+      description: Списание на одну карточку внутри дня.
+      required:
+        - cardId
+        - minutes
+        - aiAgent
+        - mergeRequests
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 2712833
+        title:
+          type: string
+          nullable: true
+          example: "BO | Маркировка | Приемка от ПП"
+        url:
+          type: string
+          nullable: true
+          description: Ссылка на карточку в Kaiten.
+          example: "https://kaiten.x5.ru/2712833"
+        type:
+          type: string
+          nullable: true
+          description: Тип карточки Kaiten.
+          enum: [DEVELOPMENT, DEFECT, TASK, OTHER]
+          example: "DEFECT"
+        aiAgent:
+          type: boolean
+          description: Проставлена ли галка «AI-Agent» (Kaiten property id_6064).
+          example: false
+        minutes:
+          type: integer
+          description: Списано минут на эту карточку в этот день.
+          example: 120
+        mergeRequests:
+          type: array
+          description: |
+            MR по этой карточке (матчинг по номеру задачи в заголовке MR). Может быть пусто,
+            если MR не заведён или заголовок не содержит номер задачи.
+          items:
+            $ref: '#/components/schemas/TimesheetMergeRequest'
+
+    TimesheetDay:
+      type: object
+      required:
+        - date
+        - minutes
+        - entries
+      properties:
+        date:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        minutes:
+          type: integer
+          description: Списано минут за этот день (сумма `time_spent` всех логов).
+          example: 480
+        entries:
+          type: array
+          description: На что списано время в этот день (по карточкам, убыв. по minutes).
+          items:
+            $ref: '#/components/schemas/TimesheetEntry'
+
+    Timesheet:
+      type: object
+      required:
+        - email
+        - from
+        - to
+        - totalMinutes
+        - loggedDays
+        - days
+      properties:
+        email:
+          $ref: 'shared.yaml#/components/schemas/Email'
+        from:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        to:
+          $ref: 'shared.yaml#/components/schemas/Date'
+        totalMinutes:
+          type: integer
+          description: Всего списано минут за период.
+          example: 9600
+        loggedDays:
+          type: integer
+          description: Сколько дней периода с ненулевым списанием (для «среднего за день»).
+          example: 18
+        days:
+          type: array
+          description: Дни со списаниями, по возрастанию даты. Пустые дни не включаются.
+          items:
+            $ref: '#/components/schemas/TimesheetDay'
 
     MarkDefectsAiAgentRequest:
       type: object
